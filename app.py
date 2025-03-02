@@ -1,13 +1,14 @@
 import sys
 import os
 
-# Add the src directory to the Python path
-src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
-sys.path.append(src_path)
+# Get the current directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Import the main function from the main module
+# Add the current directory to the Python path
+sys.path.append(current_dir)
+
+# Now import from src
 from src.main import main
 
-# Call the main function when the script is executed
 if __name__ == "__main__":
     main()
