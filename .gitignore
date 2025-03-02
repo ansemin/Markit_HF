@@ -19,5 +19,6 @@ Thumbs.db
 .gradio/
 
 # Specific files to ignore
-README.md
+README_HF.md
 requirement.txt
+.env_example
