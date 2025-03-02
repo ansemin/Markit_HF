@@ -186,7 +186,13 @@ def main():
             [chatbot, chatbot]
         )
 
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        root_path="",
+        show_error=True,
+        share=False  # Explicitly disable sharing on Hugging Face
+    )
 
 
 if __name__ == "__main__":
