@@ -7,6 +7,7 @@ colorTo: indigo
 sdk: gradio
 sdk_version: 5.14.0
 app_file: app.py
+build_script: build.sh
 pinned: false
 ---
 
@@ -21,6 +22,13 @@ Doc2Md is a tool that converts various document formats (PDF, DOCX, etc.) to Mar
 - Various OCR options depending on the selected parser
 - Page navigation for large documents
 - Chat with your documents using AI
+
+## Installation
+
+### For Development (Windows)
+```bash
+pip install -e .
+```
 
 ## How to Use
 
