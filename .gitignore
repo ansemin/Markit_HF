@@ -3,20 +3,34 @@
 
 # Virtual environment
 .venv/
-
-# Backup folder
-/backup
+venv/
+ENV/
 
 # Python caches
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local Gradio files
+.gradio/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # OS-specific
 .DS_Store
 Thumbs.db
 
-# Local Gradio files (optional, if not needed)
-.gradio/
+# Backup folder
+/backup
 
 # Specific files to ignore
 README_HF.md

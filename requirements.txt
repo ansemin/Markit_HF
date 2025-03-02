@@ -3,7 +3,7 @@ gradio==5.14.0
 grpcio-status==1.70.0
 markdown==3.7
 marker-pdf==1.3.5
-multiprocess==0.70.17
+multiprocess==0.70.16
 openai==1.61.1
 pipdeptree==2.25.0
 pytesseract==0.3.13
@@ -16,3 +16,4 @@ tesserocr>=2.5.0; platform_system != "Windows"  # Only install on non-Windows sy
 # Additional dependencies for image processing
 opencv-python-headless>=4.5.0  # Headless version for server environments
 pdf2image>=1.16.0  # For PDF processing
+dill==0.3.8  # Downgraded to be compatible with datasets
