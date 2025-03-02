@@ -1,4 +1,3 @@
-
 ---
 title: Doc2Md
 emoji: 📄
@@ -8,6 +7,7 @@ sdk: gradio
 sdk_version: 5.14.0
 app_file: app.py
 build_script: build.sh
+startup_script: setup.sh
 pinned: false
 ---
 

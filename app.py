@@ -1,6 +1,13 @@
 import sys
 import os
 
+# Set TESSDATA_PREFIX if not already set
+if not os.environ.get('TESSDATA_PREFIX'):
+    tessdata_dir = "/usr/share/tesseract-ocr/4.00/tessdata"
+    if os.path.exists(tessdata_dir):
+        os.environ['TESSDATA_PREFIX'] = tessdata_dir
+        print(f"Set TESSDATA_PREFIX to {tessdata_dir}")
+
 # Get the current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
