@@ -58,3 +58,27 @@ This application is built with Python using Gradio for the web interface. It lev
 
 ## Credits
 Developed as an open-source tool for document conversion and analysis.
+
+# Markit
+
+This project uses Tesseract OCR for document processing. The setup is handled automatically through the following scripts:
+
+1. `build.sh` - Runs during the build process to install Tesseract and dependencies
+2. `setup.sh` - Runs at startup to configure Tesseract and download language files
+
+## Deployment
+
+When deploying to Hugging Face Spaces, ensure the Space configuration includes:
+
+```yaml
+build:
+  dockerfile: Dockerfile
+  python_version: "3.10" 
+  system_packages:
+    - "tesseract-ocr"
+    - "libtesseract-dev"
+```
+
+## Development
+
+For local development, ensure you have Tesseract OCR installed and the TESSDATA_PREFIX environment variable set correctly.

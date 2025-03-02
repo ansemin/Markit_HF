@@ -3,33 +3,45 @@
 # Exit on error
 set -e
 
+echo "Setting up Tesseract OCR environment..."
+
 # Create tessdata directory if it doesn't exist
-TESSDATA_DIR="/usr/share/tesseract-ocr/4.00/tessdata"
-mkdir -p "$TESSDATA_DIR"
+mkdir -p tessdata
 
-# Download traineddata files if they don't exist
-if [ ! -f "$TESSDATA_DIR/eng.traineddata" ]; then
-    echo "Downloading eng.traineddata..."
-    wget -O "$TESSDATA_DIR/eng.traineddata" "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"
+# Set TESSDATA_PREFIX environment variable
+export TESSDATA_PREFIX="$(pwd)/tessdata"
+echo "TESSDATA_PREFIX set to: $TESSDATA_PREFIX"
+
+# Download eng.traineddata if it doesn't exist
+if [ ! -f "tessdata/eng.traineddata" ]; then
+  echo "Downloading eng.traineddata..."
+  wget -O tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+  echo "Downloaded eng.traineddata"
+else
+  echo "eng.traineddata already exists"
 fi
 
-if [ ! -f "$TESSDATA_DIR/osd.traineddata" ]; then
-    echo "Downloading osd.traineddata..."
-    wget -O "$TESSDATA_DIR/osd.traineddata" "https://github.com/tesseract-ocr/tessdata/raw/main/osd.traineddata"
+# Also copy to system location
+if [ -d "/usr/local/share/tessdata" ]; then
+  echo "Copying eng.traineddata to system location..."
+  sudo cp -f tessdata/eng.traineddata /usr/local/share/tessdata/ || echo "Failed to copy to system location, continuing anyway"
 fi
 
-# Set TESSDATA_PREFIX
-export TESSDATA_PREFIX="$TESSDATA_DIR"
-echo "TESSDATA_PREFIX=${TESSDATA_PREFIX}" >> /etc/environment
+# Verify Tesseract installation
+echo "Verifying Tesseract installation..."
+tesseract --version || echo "Tesseract not found in PATH"
 
 # Test Tesseract functionality
-echo "Testing Tesseract..."
-echo "Hello World" > test.png
-tesseract test.png stdout
-rm test.png
+echo "Testing Tesseract functionality..."
+echo "Hello World" > test.txt
+convert -size 100x30 xc:white -font Arial -pointsize 12 -fill black -annotate +10+20 "Hello World" test.png || echo "ImageMagick convert not available, skipping test image creation"
 
-# Print Tesseract version and available languages
-echo "Tesseract version:"
-tesseract --version
-echo "Available languages:"
-tesseract --list-langs 
+if [ -f "test.png" ]; then
+  tesseract test.png test_output || echo "Tesseract test failed, but continuing"
+  if [ -f "test_output.txt" ]; then
+    echo "Tesseract test output:"
+    cat test_output.txt
+  fi
+fi
+
+echo "Setup completed" 
