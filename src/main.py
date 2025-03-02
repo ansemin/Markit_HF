@@ -186,7 +186,7 @@ def main():
             [chatbot, chatbot]
         )
 
-    demo.launch(share=True)
+    demo.launch(server_name="0.0.0.0", server_port=7860, ssr=False)
 
 
 if __name__ == "__main__":
