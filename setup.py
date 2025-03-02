@@ -11,6 +11,11 @@ else:
     platform_deps = [
         'tesserocr>=2.5.0',  # Use pip version on Linux
     ]
+    
+    # For Linux environments, try to install system dependencies
+    if os.path.exists('/usr/bin/apt-get'):
+        print("Installing system dependencies for tesseract...")
+        os.system("apt-get update && apt-get install -y tesseract-ocr libtesseract-dev libleptonica-dev")
 
 setup(
     name="doc2md",
