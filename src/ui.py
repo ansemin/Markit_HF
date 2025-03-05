@@ -2,11 +2,14 @@ import gradio as gr
 import markdown
 import threading
 import time
+import logging
 from converter import convert_file, set_cancellation_flag
 from docling_chat import chat_with_document
 from parser_registry import ParserRegistry
-import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Add a global variable to track cancellation state
 conversion_cancelled = threading.Event()
@@ -60,24 +63,41 @@ def update_page_content(pages, page_number):
     return str(pages[page_number - 1]), page_number, f"Page {page_number}/{len(pages)}"
 
 
-def handle_convert(file_path, parser_name, ocr_method_name, output_format):
+def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_cancelled):
     """Handle file conversion."""
     global conversion_cancelled
+    
+    # Check if we should cancel before starting
+    if is_cancelled:
+        logger.info("Conversion cancelled before starting")
+        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+    
+    # Reset the cancellation flag at the start of conversion
+    conversion_cancelled.clear()
+    logger.info("Starting conversion with cancellation flag cleared")
     
     try:
         # Perform the conversion
         content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
         
-        # If conversion was cancelled, return early
+        # Check if the conversion was cancelled
+        if conversion_cancelled.is_set() or is_cancelled:
+            logger.info("Conversion was cancelled during processing")
+            return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+        
+        # If conversion returned a cancellation message
         if content == "Conversion cancelled.":
+            logger.info("Converter returned cancellation message")
             return content, None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
         
         # Process results
         pages = split_content_into_pages(str(content))
         page_info = f"Page 1/{len(pages)}"
         
+        logger.info("Conversion completed successfully")
         return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
     except Exception as e:
+        logger.error(f"Error during conversion: {str(e)}")
         return f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
 
 
@@ -91,16 +111,6 @@ def handle_page_navigation(direction, current, pages):
     return content, new_page, page_info
 
 
-def cancel_conversion():
-    """Set the cancellation flag and force UI update."""
-    global conversion_cancelled
-    # Set the flag
-    conversion_cancelled.set()
-    logging.info("Cancel button clicked, flag set")
-    # Update UI immediately to show cancellation is in progress
-    return gr.update(visible=False)
-
-
 def create_ui():
     with gr.Blocks(css="""
         .page-navigation { text-align: center; margin-top: 1rem; }
@@ -109,6 +119,9 @@ def create_ui():
         .processing-controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
     """) as demo:
         gr.Markdown("Markit: Convert any documents to Markdown")
+        
+        # State to track if cancellation is requested
+        cancel_requested = gr.State(False)
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
@@ -178,23 +191,36 @@ def create_ui():
             outputs=[ocr_dropdown]
         )
 
-        # Show/hide appropriate buttons when conversion starts
+        # Reset cancel flag when starting conversion
+        def start_conversion():
+            global conversion_cancelled
+            conversion_cancelled.clear()
+            return gr.update(visible=False), gr.update(visible=True), False
+
+        # Set cancel flag when cancel button is clicked
+        def request_cancellation():
+            global conversion_cancelled
+            conversion_cancelled.set()
+            logger.info("Cancel button clicked, cancellation flag set")
+            return gr.update(visible=True), gr.update(visible=False), True
+
+        # Start conversion sequence
         convert_button.click(
-            fn=lambda: (gr.update(visible=False), gr.update(visible=True)),
+            fn=start_conversion,
             inputs=[],
-            outputs=[convert_button, cancel_button],
+            outputs=[convert_button, cancel_button, cancel_requested],
             queue=False  # Execute immediately
-        ).then(  # Chain the conversion process after button update
+        ).then(
             fn=handle_convert,
-            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format],
+            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format, cancel_requested],
             outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button]
         )
         
         # Handle cancel button click
         cancel_button.click(
-            fn=lambda: (gr.update(visible=True), gr.update(visible=False)),
+            fn=request_cancellation,
             inputs=[],
-            outputs=[convert_button, cancel_button],
+            outputs=[convert_button, cancel_button, cancel_requested],
             queue=False  # Execute immediately
         )
 
