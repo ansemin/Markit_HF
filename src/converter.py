@@ -2,7 +2,6 @@ import tempfile
 import logging
 import time
 import os
-import threading
 from pathlib import Path
 
 # Use relative imports instead of absolute imports
@@ -13,13 +12,23 @@ import parsers
 
 # Reference to the cancellation flag from ui.py
 # This will be set by the UI when the cancel button is clicked
-conversion_cancelled = None
+conversion_cancelled = None  # Will be a threading.Event object
 
 def set_cancellation_flag(flag):
     """Set the reference to the cancellation flag from ui.py"""
     global conversion_cancelled
     conversion_cancelled = flag
 
+def is_conversion_in_progress():
+    """Check if conversion is currently in progress"""
+    return conversion_cancelled is not None
+
+def check_cancellation():
+    """Check if cancellation has been requested"""
+    if conversion_cancelled and conversion_cancelled.is_set():
+        logging.info("Cancellation detected in check_cancellation")
+        return True
+    return False
 
 def convert_file(file_path, parser_name, ocr_method_name, output_format):
     """
@@ -40,7 +49,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         return "Please upload a file.", None
 
     # Check for cancellation
-    if conversion_cancelled and conversion_cancelled.is_set():
+    if check_cancellation():
         logging.info("Cancellation detected at start of convert_file")
         return "Conversion cancelled.", None
 
@@ -54,7 +63,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
                 chunk_size = 1024 * 1024  # 1MB chunks
                 while True:
                     # Check for cancellation frequently
-                    if conversion_cancelled and conversion_cancelled.is_set():
+                    if check_cancellation():
                         temp_input.close()
                         os.unlink(temp_input.name)
                         logging.info("Cancellation detected during file copy")
@@ -69,7 +78,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         return f"Error creating temporary file: {e}", None
 
     # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
+    if check_cancellation():
         # Clean up temp file
         try:
             os.unlink(temp_input.name)
@@ -104,7 +113,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         logging.info(f"Processed in {duration:.2f} seconds.")
         
         # Check for cancellation after processing
-        if conversion_cancelled and conversion_cancelled.is_set():
+        if check_cancellation():
             # Clean up temp file
             try:
                 os.unlink(temp_input.name)
@@ -134,7 +143,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         ext = ".txt"
 
     # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
+    if check_cancellation():
         # Clean up temp file
         try:
             os.unlink(temp_input.name)
@@ -150,7 +159,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             chunk_size = 10000  # characters
             for i in range(0, len(content), chunk_size):
                 # Check for cancellation
-                if conversion_cancelled and conversion_cancelled.is_set():
+                if check_cancellation():
                     tmp.close()
                     os.unlink(tmp.name)
                     try:

@@ -1,6 +1,8 @@
 from typing import Optional, Dict, Any, Union
 from pathlib import Path
 import threading
+import logging
+import time
 
 from parser_interface import DocumentParser
 from parser_registry import ParserRegistry
@@ -23,8 +25,6 @@ class ParserFactory:
         parser_class = ParserRegistry.get_parser_class(parser_name)
         if not parser_class:
             return None
-            
-        # Instantiate the parser
         return parser_class()
     
     @classmethod
@@ -49,10 +49,17 @@ class ParserFactory:
         Returns:
             str: The parsed content
         """
+        # Helper function to check cancellation
+        def check_cancellation():
+            if cancellation_flag and cancellation_flag.is_set():
+                logging.info("Cancellation detected in parser_factory")
+                return True
+            return False
+            
         # Check for cancellation immediately
-        if cancellation_flag and cancellation_flag.is_set():
+        if check_cancellation():
             return "Conversion cancelled."
-        
+            
         parser = cls.create_parser(parser_name)
         if not parser:
             raise ValueError(f"Unknown parser: {parser_name}")
@@ -63,7 +70,7 @@ class ParserFactory:
             raise ValueError(f"Unknown OCR method: {ocr_method_name} for parser {parser_name}")
         
         # Check for cancellation again before starting the parsing
-        if cancellation_flag and cancellation_flag.is_set():
+        if check_cancellation():
             return "Conversion cancelled."
         
         # Parse the document, passing the cancellation flag
@@ -74,7 +81,33 @@ class ParserFactory:
         result = parser.parse(file_path, ocr_method=ocr_method_id, **kwargs)
         
         # Check one more time after parsing completes
-        if cancellation_flag and cancellation_flag.is_set():
+        if check_cancellation():
             return "Conversion cancelled."
-        
+            
         return result 
+
+def check_cancellation_periodically(interval=0.1):
+    """Decorator to check cancellation flag periodically during execution"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            cancellation_flag = kwargs.get('cancellation_flag')
+            last_check = time.time()
+            
+            def should_check():
+                nonlocal last_check
+                now = time.time()
+                if now - last_check >= interval:
+                    last_check = now
+                    return True
+                return False
+            
+            # Add a check function to kwargs that parsers can call
+            kwargs['should_check_cancellation'] = should_check
+            
+            # Check before starting
+            if cancellation_flag and cancellation_flag.is_set():
+                return "Conversion cancelled."
+                
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator 
