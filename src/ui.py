@@ -74,6 +74,8 @@ def create_ui():
         .page-navigation { text-align: center; margin-top: 1rem; }
         .page-navigation button { margin: 0 0.5rem; }
         .page-info { display: inline-block; margin: 0 1rem; }
+        .processing-indicator { display: flex; align-items: center; gap: 10px; }
+        .cancel-btn { background-color: #ff4d4f; color: white; }
     """) as demo:
         gr.Markdown("Doc2Md: Convert any documents to Markdown")
 
@@ -95,6 +97,13 @@ def create_ui():
                         next_btn = gr.Button("→", elem_classes=["page-navigation"])
                 
                 file_download = gr.File(label="Download File")
+                
+                # Add processing indicator and cancel button
+                with gr.Row(visible=False) as processing_row:
+                    with gr.Column(scale=3):
+                        processing_indicator = gr.Markdown("Processing document... This may take a while.", elem_classes=["processing-indicator"])
+                    with gr.Column(scale=1):
+                        cancel_btn = gr.Button("Cancel", elem_classes=["cancel-btn"])
                 
                 convert_button = gr.Button("Convert")
 
@@ -142,10 +151,37 @@ def create_ui():
             outputs=[ocr_dropdown]
         )
 
+        def start_processing():
+            return gr.update(visible=True), gr.update(interactive=False)
+        
+        def end_processing():
+            return gr.update(visible=False), gr.update(interactive=True)
+        
         convert_button.click(
+            fn=start_processing,
+            inputs=None,
+            outputs=[processing_row, convert_button],
+            queue=False
+        ).then(
             fn=handle_convert,
             inputs=[file_input, provider_dropdown, ocr_dropdown, output_format],
             outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row]
+        ).then(
+            fn=end_processing,
+            inputs=None,
+            outputs=[processing_row, convert_button]
+        )
+        
+        # Add cancel button functionality
+        cancel_btn.click(
+            fn=lambda: None,
+            inputs=None,
+            outputs=None,
+            cancels=[convert_button]
+        ).then(
+            fn=end_processing,
+            inputs=None,
+            outputs=[processing_row, convert_button]
         )
 
         prev_btn.click(
