@@ -265,4 +265,4 @@ def launch_ui(server_name="0.0.0.0", server_port=7860, share=False):
         root_path="",
         show_error=True,
         share=share
-    ) 
+    )

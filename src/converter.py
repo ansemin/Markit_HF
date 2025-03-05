@@ -11,15 +11,28 @@ from parser_factory import ParserFactory
 # Import all parsers to ensure they're registered
 import parsers
 
-# Reference to the cancellation flag from ui.py
-# This will be set by the UI when the cancel button is clicked
-conversion_cancelled = None
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Global cancellation flag
+_cancellation_flag = None
 
 def set_cancellation_flag(flag):
-    """Set the reference to the cancellation flag from ui.py"""
-    global conversion_cancelled
-    conversion_cancelled = flag
+    """Set the cancellation flag to be used by the converter."""
+    global _cancellation_flag
+    _cancellation_flag = flag
+    logger.info("Cancellation flag set in converter module")
 
+def is_cancelled():
+    """Check if cancellation has been requested."""
+    global _cancellation_flag
+    if _cancellation_flag is None:
+        return False
+    cancelled = _cancellation_flag.is_set()
+    if cancelled:
+        logger.info("Cancellation detected in converter")
+    return cancelled
 
 def convert_file(file_path, parser_name, ocr_method_name, output_format):
     """
@@ -34,14 +47,13 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     Returns:
         tuple: (content, download_file_path)
     """
-    global conversion_cancelled
-    
+    # Check for cancellation at the start
+    if is_cancelled():
+        logger.info("Conversion cancelled before starting parser")
+        return "Conversion cancelled.", None
+
     if not file_path:
         return "Please upload a file.", None
-
-    # Check for cancellation
-    if conversion_cancelled and conversion_cancelled.is_set():
-        return "Conversion cancelled.", None
 
     # Create a temporary file with English filename
     try:
@@ -54,8 +66,9 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     except Exception as e:
         return f"Error creating temporary file: {e}", None
 
-    # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
+    # Check for cancellation after parser creation
+    if is_cancelled():
+        logger.info("Conversion cancelled after parser creation")
         # Clean up temp file
         try:
             os.unlink(temp_input.name)
@@ -76,14 +89,15 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             parser_name=parser_name,
             ocr_method_name=ocr_method_name,
             output_format=output_format.lower(),
-            cancellation_flag=conversion_cancelled  # Pass the flag to parsers
+            cancellation_flag=is_cancelled  # Pass the flag to parsers
         )
         
         duration = time.time() - start
         logging.info(f"Processed in {duration:.2f} seconds.")
         
         # Check for cancellation after processing
-        if conversion_cancelled and conversion_cancelled.is_set():
+        if is_cancelled():
+            logger.info("Conversion cancelled after parsing")
             # Clean up temp file
             try:
                 os.unlink(temp_input.name)
@@ -111,8 +125,9 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     else:
         ext = ".txt"
 
-    # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
+    # Check for cancellation after formatting
+    if is_cancelled():
+        logger.info("Conversion cancelled after formatting")
         # Clean up temp file
         try:
             os.unlink(temp_input.name)
