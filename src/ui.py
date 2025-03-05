@@ -195,6 +195,7 @@ def create_ui():
         def start_conversion():
             global conversion_cancelled
             conversion_cancelled.clear()
+            logger.info("Starting conversion with cancellation flag cleared")
             return gr.update(visible=False), gr.update(visible=True), False
 
         # Set cancel flag when cancel button is clicked
@@ -202,6 +203,7 @@ def create_ui():
             global conversion_cancelled
             conversion_cancelled.set()
             logger.info("Cancel button clicked, cancellation flag set")
+            # Add immediate feedback to the user
             return gr.update(visible=True), gr.update(visible=False), True
 
         # Start conversion sequence

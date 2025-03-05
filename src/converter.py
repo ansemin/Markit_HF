@@ -41,6 +41,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
 
     # Check for cancellation
     if conversion_cancelled and conversion_cancelled.is_set():
+        logging.info("Cancellation detected at start of convert_file")
         return "Conversion cancelled.", None
 
     # Create a temporary file with English filename
@@ -49,7 +50,20 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         with tempfile.NamedTemporaryFile(suffix=original_ext, delete=False) as temp_input:
             # Copy the content of original file to temp file
             with open(file_path, 'rb') as original:
-                temp_input.write(original.read())
+                # Read in smaller chunks and check for cancellation between chunks
+                chunk_size = 1024 * 1024  # 1MB chunks
+                while True:
+                    # Check for cancellation frequently
+                    if conversion_cancelled and conversion_cancelled.is_set():
+                        temp_input.close()
+                        os.unlink(temp_input.name)
+                        logging.info("Cancellation detected during file copy")
+                        return "Conversion cancelled.", None
+                    
+                    chunk = original.read(chunk_size)
+                    if not chunk:
+                        break
+                    temp_input.write(chunk)
         file_path = temp_input.name
     except Exception as e:
         return f"Error creating temporary file: {e}", None
@@ -61,14 +75,12 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             os.unlink(temp_input.name)
         except:
             pass
+        logging.info("Cancellation detected after file preparation")
         return "Conversion cancelled.", None
 
     try:
         # Use the parser factory to parse the document
         start = time.time()
-        
-        # We need to modify the parsing process to check for cancellation
-        # This requires changes to the parser implementation, but we can add a hook here
         
         # Pass the cancellation flag to the parser factory
         content = ParserFactory.parse_document(
@@ -78,6 +90,15 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             output_format=output_format.lower(),
             cancellation_flag=conversion_cancelled  # Pass the flag to parsers
         )
+        
+        # If content indicates cancellation, return early
+        if content == "Conversion cancelled.":
+            logging.info("Parser reported cancellation")
+            try:
+                os.unlink(temp_input.name)
+            except:
+                pass
+            return content, None
         
         duration = time.time() - start
         logging.info(f"Processed in {duration:.2f} seconds.")
@@ -89,6 +110,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
                 os.unlink(temp_input.name)
             except:
                 pass
+            logging.info("Cancellation detected after processing")
             return "Conversion cancelled.", None
             
     except Exception as e:
@@ -118,12 +140,28 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             os.unlink(temp_input.name)
         except:
             pass
+        logging.info("Cancellation detected before output file creation")
         return "Conversion cancelled.", None
 
     try:
         # Create a temporary file for download
         with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False, encoding="utf-8") as tmp:
-            tmp.write(content)
+            # Write in chunks and check for cancellation
+            chunk_size = 10000  # characters
+            for i in range(0, len(content), chunk_size):
+                # Check for cancellation
+                if conversion_cancelled and conversion_cancelled.is_set():
+                    tmp.close()
+                    os.unlink(tmp.name)
+                    try:
+                        os.unlink(temp_input.name)
+                    except:
+                        pass
+                    logging.info("Cancellation detected during output file writing")
+                    return "Conversion cancelled.", None
+                
+                tmp.write(content[i:i+chunk_size])
+            
             tmp_path = tmp.name
         
         # Clean up the temporary input file

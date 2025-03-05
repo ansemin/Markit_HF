@@ -32,6 +32,7 @@ class ParserFactory:
                       file_path: Union[str, Path], 
                       parser_name: str, 
                       ocr_method_name: str,
+                      output_format: str = "markdown",
                       cancellation_flag: Optional[threading.Event] = None,
                       **kwargs) -> str:
         """
@@ -41,12 +42,17 @@ class ParserFactory:
             file_path: Path to the document
             parser_name: Name of the parser to use
             ocr_method_name: Display name of the OCR method to use
+            output_format: Output format (markdown, json, text, document_tags)
             cancellation_flag: Optional flag to check for cancellation
             **kwargs: Additional parser-specific options
             
         Returns:
             str: The parsed content
         """
+        # Check for cancellation immediately
+        if cancellation_flag and cancellation_flag.is_set():
+            return "Conversion cancelled."
+        
         parser = cls.create_parser(parser_name)
         if not parser:
             raise ValueError(f"Unknown parser: {parser_name}")
@@ -56,10 +62,19 @@ class ParserFactory:
         if not ocr_method_id:
             raise ValueError(f"Unknown OCR method: {ocr_method_name} for parser {parser_name}")
         
-        # Check for cancellation
+        # Check for cancellation again before starting the parsing
         if cancellation_flag and cancellation_flag.is_set():
             return "Conversion cancelled."
         
         # Parse the document, passing the cancellation flag
         kwargs['cancellation_flag'] = cancellation_flag
-        return parser.parse(file_path, ocr_method=ocr_method_id, **kwargs) 
+        kwargs['output_format'] = output_format
+        
+        # Add a wrapper to check for cancellation periodically during parsing
+        result = parser.parse(file_path, ocr_method=ocr_method_id, **kwargs)
+        
+        # Check one more time after parsing completes
+        if cancellation_flag and cancellation_flag.is_set():
+            return "Conversion cancelled."
+        
+        return result 
