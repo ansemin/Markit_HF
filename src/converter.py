@@ -33,6 +33,14 @@ def check_cancellation():
         return True
     return False
 
+def safe_delete_file(file_path):
+    """Safely delete a file with error handling"""
+    if file_path and os.path.exists(file_path):
+        try:
+            os.unlink(file_path)
+        except Exception as e:
+            logging.error(f"Error cleaning up temp file {file_path}: {e}")
+
 def convert_file(file_path, parser_name, ocr_method_name, output_format):
     """
     Convert a file using the specified parser and OCR method.
@@ -51,6 +59,10 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     # Set the conversion in progress flag
     _conversion_in_progress = True
     
+    # Temporary file paths to clean up
+    temp_input = None
+    tmp_path = None
+    
     # Ensure we clean up the flag when we're done
     try:
         if not file_path:
@@ -62,7 +74,6 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             return "Conversion cancelled.", None
 
         # Create a temporary file with English filename
-        temp_input = None
         try:
             original_ext = Path(file_path).suffix
             with tempfile.NamedTemporaryFile(suffix=original_ext, delete=False) as temp_file:
@@ -75,11 +86,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
                         # Check for cancellation frequently
                         if check_cancellation():
                             logging.info("Cancellation detected during file copy")
-                            # Clean up temp file
-                            try:
-                                os.unlink(temp_input)
-                            except Exception as e:
-                                logging.error(f"Error cleaning up temp file: {e}")
+                            safe_delete_file(temp_input)
                             return "Conversion cancelled.", None
                         
                         chunk = original.read(chunk_size)
@@ -88,23 +95,13 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
                         temp_file.write(chunk)
             file_path = temp_input
         except Exception as e:
-            # Clean up temp file if it exists
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as cleanup_error:
-                    logging.error(f"Error cleaning up temp file: {cleanup_error}")
+            safe_delete_file(temp_input)
             return f"Error creating temporary file: {e}", None
 
         # Check for cancellation again
         if check_cancellation():
-            # Clean up temp file
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as e:
-                    logging.error(f"Error cleaning up temp file: {e}")
             logging.info("Cancellation detected after file preparation")
+            safe_delete_file(temp_input)
             return "Conversion cancelled.", None
 
         content = None
@@ -124,12 +121,7 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             # If content indicates cancellation, return early
             if content == "Conversion cancelled.":
                 logging.info("Parser reported cancellation")
-                # Clean up temp file
-                if temp_input and os.path.exists(temp_input):
-                    try:
-                        os.unlink(temp_input)
-                    except Exception as e:
-                        logging.error(f"Error cleaning up temp file: {e}")
+                safe_delete_file(temp_input)
                 return content, None
             
             duration = time.time() - start
@@ -137,22 +129,12 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             
             # Check for cancellation after processing
             if check_cancellation():
-                # Clean up temp file
-                if temp_input and os.path.exists(temp_input):
-                    try:
-                        os.unlink(temp_input)
-                    except Exception as e:
-                        logging.error(f"Error cleaning up temp file: {e}")
                 logging.info("Cancellation detected after processing")
+                safe_delete_file(temp_input)
                 return "Conversion cancelled.", None
                 
         except Exception as e:
-            # Clean up temp file
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as cleanup_error:
-                    logging.error(f"Error cleaning up temp file: {cleanup_error}")
+            safe_delete_file(temp_input)
             return f"Error: {e}", None
 
         # Determine the file extension based on the output format
@@ -169,16 +151,10 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
 
         # Check for cancellation again
         if check_cancellation():
-            # Clean up temp file
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as e:
-                    logging.error(f"Error cleaning up temp file: {e}")
             logging.info("Cancellation detected before output file creation")
+            safe_delete_file(temp_input)
             return "Conversion cancelled.", None
 
-        tmp_path = None
         try:
             # Create a temporary file for download
             with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False, encoding="utf-8") as tmp:
@@ -188,43 +164,27 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
                 for i in range(0, len(content), chunk_size):
                     # Check for cancellation
                     if check_cancellation():
-                        # Clean up temp files
-                        if tmp_path and os.path.exists(tmp_path):
-                            try:
-                                os.unlink(tmp_path)
-                            except Exception as e:
-                                logging.error(f"Error cleaning up temp file: {e}")
-                        if temp_input and os.path.exists(temp_input):
-                            try:
-                                os.unlink(temp_input)
-                            except Exception as e:
-                                logging.error(f"Error cleaning up temp file: {e}")
                         logging.info("Cancellation detected during output file writing")
+                        safe_delete_file(tmp_path)
+                        safe_delete_file(temp_input)
                         return "Conversion cancelled.", None
                     
                     tmp.write(content[i:i+chunk_size])
             
             # Clean up the temporary input file
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as e:
-                    logging.error(f"Error cleaning up temp file: {e}")
+            safe_delete_file(temp_input)
+            temp_input = None  # Mark as cleaned up
                 
             return content, tmp_path
         except Exception as e:
-            # Clean up temp files
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.unlink(tmp_path)
-                except Exception as cleanup_error:
-                    logging.error(f"Error cleaning up temp file: {cleanup_error}")
-            if temp_input and os.path.exists(temp_input):
-                try:
-                    os.unlink(temp_input)
-                except Exception as cleanup_error:
-                    logging.error(f"Error cleaning up temp file: {cleanup_error}")
+            safe_delete_file(tmp_path)
+            safe_delete_file(temp_input)
             return f"Error: {e}", None
     finally:
+        # Always clean up any remaining temp files
+        safe_delete_file(temp_input)
+        if check_cancellation() and tmp_path:
+            safe_delete_file(tmp_path)
+            
         # Always clear the conversion in progress flag when done
         _conversion_in_progress = False

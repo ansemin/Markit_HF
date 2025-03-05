@@ -13,21 +13,17 @@ logger = logging.getLogger(__name__)
 
 # Add a global variable to track cancellation state
 conversion_cancelled = threading.Event()
-# Add a global variable to track if conversion is in progress
-conversion_in_progress = threading.Event()
 
 # Pass the cancellation flag to the converter module
 set_cancellation_flag(conversion_cancelled)
 
 # Add a background thread to monitor cancellation
-def monitor_cancellation(progress=None):
+def monitor_cancellation():
     """Background thread to monitor cancellation and update UI if needed"""
     logger.info("Starting cancellation monitor thread")
-    while conversion_in_progress.is_set():
+    while is_conversion_in_progress():
         if conversion_cancelled.is_set():
             logger.info("Cancellation detected by monitor thread")
-            # Sleep briefly to allow other threads to respond
-            time.sleep(0.1)
         time.sleep(0.1)  # Check every 100ms
     logger.info("Cancellation monitor thread ending")
 
@@ -80,12 +76,10 @@ def update_page_content(pages, page_number):
 # Function to run conversion in a separate thread
 def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format):
     """Run the conversion in a separate thread and return the thread object"""
-    global conversion_cancelled, conversion_in_progress
+    global conversion_cancelled
     
     # Reset the cancellation flag
     conversion_cancelled.clear()
-    # Set the in-progress flag
-    conversion_in_progress.set()
     
     # Create a container for the results
     results = {"content": None, "download_file": None, "error": None}
@@ -98,9 +92,6 @@ def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format
         except Exception as e:
             logger.error(f"Error during conversion: {str(e)}")
             results["error"] = str(e)
-        finally:
-            # Clear the in-progress flag
-            conversion_in_progress.clear()
     
     # Create and start the thread
     thread = threading.Thread(target=conversion_worker)
@@ -112,7 +103,7 @@ def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format
 
 def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_cancelled):
     """Handle file conversion."""
-    global conversion_cancelled, conversion_in_progress
+    global conversion_cancelled
     
     # Check if we should cancel before starting
     if is_cancelled:
@@ -257,9 +248,8 @@ def create_ui():
 
         # Reset cancel flag when starting conversion
         def start_conversion():
-            global conversion_cancelled, conversion_in_progress
+            global conversion_cancelled
             conversion_cancelled.clear()
-            conversion_in_progress.clear()
             logger.info("Starting conversion with cancellation flag cleared")
             return gr.update(visible=False), gr.update(visible=True), False
 

@@ -74,9 +74,9 @@ class ParserFactory:
             return "Conversion cancelled."
         
         # Add a function to check cancellation that parsers can call
-        def should_check_cancellation(interval=0.1):
+        def should_check_cancellation():
             """Function that parsers can call to check if they should check cancellation"""
-            time.sleep(interval)  # Brief pause to allow other threads to run
+            # No need to sleep here - this just returns whether cancellation should be checked
             return True
             
         # Parse the document, passing the cancellation flag and helper functions
@@ -93,29 +93,3 @@ class ParserFactory:
             return "Conversion cancelled."
             
         return result 
-
-def check_cancellation_periodically(interval=0.1):
-    """Decorator to check cancellation flag periodically during execution"""
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            cancellation_flag = kwargs.get('cancellation_flag')
-            last_check = time.time()
-            
-            def should_check():
-                nonlocal last_check
-                now = time.time()
-                if now - last_check >= interval:
-                    last_check = now
-                    return True
-                return False
-            
-            # Add a check function to kwargs that parsers can call
-            kwargs['should_check_cancellation'] = should_check
-            
-            # Check before starting
-            if cancellation_flag and cancellation_flag.is_set():
-                return "Conversion cancelled."
-                
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator 
