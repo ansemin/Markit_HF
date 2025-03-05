@@ -18,7 +18,7 @@ Doc2Md is a tool that converts various document formats (PDF, DOCX, etc.) to Mar
 
 ## Features
 - Convert documents to Markdown, JSON, Text, or Document Tags format
-- Multiple parsing engines: PyPdfium, Docling, and Marker
+- Multiple parsing engines: PyPdfium, Docling, Marker, and Gemini Flash
 - Various OCR options depending on the selected parser
 - Page navigation for large documents
 - Chat with your documents using AI
@@ -30,12 +30,26 @@ Doc2Md is a tool that converts various document formats (PDF, DOCX, etc.) to Mar
 pip install -e .
 ```
 
+### Gemini Flash Parser
+To use the Gemini Flash parser, you need to:
+1. Install the Google Gemini API client: `pip install google-genai`
+2. Set the `GOOGLE_API_KEY` environment variable with your Gemini API key
+   ```bash
+   # On Windows
+   set GOOGLE_API_KEY=your_api_key_here
+   
+   # On Linux/Mac
+   export GOOGLE_API_KEY=your_api_key_here
+   ```
+3. You can obtain a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+
 ## How to Use
 
 ### 1. Upload and Convert
 - Upload your document using the file uploader
-- Select a parser provider (PyPdfium, Docling, or Marker)
+- Select a parser provider (PyPdfium, Docling, Marker, or Gemini Flash)
 - Choose an OCR option based on your selected provider
+  - Note: Gemini Flash automatically handles OCR, so no OCR option is needed
 - Select your desired output format
 - Click "Convert" to process your document
 - Navigate through pages using the arrow buttons

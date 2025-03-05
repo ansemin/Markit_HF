@@ -4,6 +4,7 @@
 from src.parsers.docling_parser import DoclingParser
 from src.parsers.marker_parser import MarkerParser
 from src.parsers.pypdfium_parser import PyPdfiumParser
+from src.parsers.gemini_flash_parser import GeminiFlashParser
 
 # You can add new parsers here in the future 
 

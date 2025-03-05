@@ -5,6 +5,11 @@ set -e
 
 echo "Setting up Tesseract OCR environment..."
 
+# Install google-genai package
+echo "Installing Google Gemini API client..."
+pip install -q -U google-genai
+echo "Google Gemini API client installed successfully"
+
 # Create tessdata directory if it doesn't exist
 mkdir -p tessdata
 

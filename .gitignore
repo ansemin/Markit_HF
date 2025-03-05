@@ -36,3 +36,11 @@ Thumbs.db
 README_HF.md
 requirement.txt
 .env_example
+
+# Ignore documents folder
+/documents/
+/documents/*
+
+# Ignore tessdata folder
+/tessdata/
+/tessdata/*

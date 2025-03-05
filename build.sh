@@ -73,6 +73,11 @@ print(f'Available languages: {tesserocr.get_languages()}')
 print(f'TESSDATA_PREFIX: {tesserocr.get_languages()[1]}')
 "
 
+# Install Google Gemini API client
+echo "Installing Google Gemini API client..."
+pip install -q -U google-genai
+echo "Google Gemini API client installed successfully"
+
 # Install Python dependencies
 echo "Installing Python dependencies..."
 pip install -e .
