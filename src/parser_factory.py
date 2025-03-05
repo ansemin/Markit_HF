@@ -73,11 +73,19 @@ class ParserFactory:
         if check_cancellation():
             return "Conversion cancelled."
         
-        # Parse the document, passing the cancellation flag
+        # Add a function to check cancellation that parsers can call
+        def should_check_cancellation(interval=0.1):
+            """Function that parsers can call to check if they should check cancellation"""
+            time.sleep(interval)  # Brief pause to allow other threads to run
+            return True
+            
+        # Parse the document, passing the cancellation flag and helper functions
         kwargs['cancellation_flag'] = cancellation_flag
+        kwargs['check_cancellation'] = check_cancellation
+        kwargs['should_check_cancellation'] = should_check_cancellation
         kwargs['output_format'] = output_format
         
-        # Add a wrapper to check for cancellation periodically during parsing
+        # Parse the document
         result = parser.parse(file_path, ocr_method=ocr_method_id, **kwargs)
         
         # Check one more time after parsing completes

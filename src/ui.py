@@ -77,6 +77,39 @@ def update_page_content(pages, page_number):
     return str(pages[page_number - 1]), page_number, f"Page {page_number}/{len(pages)}"
 
 
+# Function to run conversion in a separate thread
+def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format):
+    """Run the conversion in a separate thread and return the thread object"""
+    global conversion_cancelled, conversion_in_progress
+    
+    # Reset the cancellation flag
+    conversion_cancelled.clear()
+    # Set the in-progress flag
+    conversion_in_progress.set()
+    
+    # Create a container for the results
+    results = {"content": None, "download_file": None, "error": None}
+    
+    def conversion_worker():
+        try:
+            content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+            results["content"] = content
+            results["download_file"] = download_file
+        except Exception as e:
+            logger.error(f"Error during conversion: {str(e)}")
+            results["error"] = str(e)
+        finally:
+            # Clear the in-progress flag
+            conversion_in_progress.clear()
+    
+    # Create and start the thread
+    thread = threading.Thread(target=conversion_worker)
+    thread.daemon = True
+    thread.start()
+    
+    return thread, results
+
+
 def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_cancelled):
     """Handle file conversion."""
     global conversion_cancelled, conversion_in_progress
@@ -84,47 +117,50 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_ca
     # Check if we should cancel before starting
     if is_cancelled:
         logger.info("Conversion cancelled before starting")
-        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
     
-    # Reset the cancellation flag at the start of conversion
-    conversion_cancelled.clear()
-    # Set the in-progress flag
-    conversion_in_progress.set()
     logger.info("Starting conversion with cancellation flag cleared")
+    
+    # Start the conversion in a separate thread
+    thread, results = run_conversion_thread(file_path, parser_name, ocr_method_name, output_format)
     
     # Start the monitoring thread
     monitor_thread = threading.Thread(target=monitor_cancellation)
     monitor_thread.daemon = True
     monitor_thread.start()
     
-    try:
-        # Perform the conversion
-        content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+    # Wait for the thread to complete or be cancelled
+    while thread.is_alive():
+        # Check if cancellation was requested
+        if conversion_cancelled.is_set():
+            logger.info("Cancellation detected, waiting for thread to finish")
+            # Give the thread a chance to clean up
+            thread.join(timeout=0.5)
+            if thread.is_alive():
+                logger.warning("Thread did not finish within timeout")
+            return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
         
-        # Clear the in-progress flag
-        conversion_in_progress.clear()
-        
-        # Check if the conversion was cancelled
-        if conversion_cancelled.is_set() or is_cancelled:
-            logger.info("Conversion was cancelled during processing")
-            return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
-        
-        # If conversion returned a cancellation message
-        if content == "Conversion cancelled.":
-            logger.info("Converter returned cancellation message")
-            return content, None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
-        
-        # Process results
-        pages = split_content_into_pages(str(content))
-        page_info = f"Page 1/{len(pages)}"
-        
-        logger.info("Conversion completed successfully")
-        return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
-    except Exception as e:
-        # Clear the in-progress flag
-        conversion_in_progress.clear()
-        logger.error(f"Error during conversion: {str(e)}")
-        return f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+        # Sleep briefly to avoid busy waiting
+        time.sleep(0.1)
+    
+    # Thread has completed, check results
+    if results["error"]:
+        return f"Error: {results['error']}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+    
+    content = results["content"]
+    download_file = results["download_file"]
+    
+    # If conversion returned a cancellation message
+    if content == "Conversion cancelled.":
+        logger.info("Converter returned cancellation message")
+        return content, None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+    
+    # Process results
+    pages = split_content_into_pages(str(content))
+    page_info = f"Page 1/{len(pages)}"
+    
+    logger.info("Conversion completed successfully")
+    return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), None
 
 
 def handle_page_navigation(direction, current, pages):
@@ -148,6 +184,8 @@ def create_ui():
         
         # State to track if cancellation is requested
         cancel_requested = gr.State(False)
+        # State to store the conversion thread
+        conversion_thread = gr.State(None)
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
@@ -221,17 +259,25 @@ def create_ui():
         def start_conversion():
             global conversion_cancelled, conversion_in_progress
             conversion_cancelled.clear()
-            conversion_in_progress.clear()  # Reset this flag too
+            conversion_in_progress.clear()
             logger.info("Starting conversion with cancellation flag cleared")
             return gr.update(visible=False), gr.update(visible=True), False
 
-        # Set cancel flag when cancel button is clicked
-        def request_cancellation():
+        # Set cancel flag and terminate thread when cancel button is clicked
+        def request_cancellation(thread):
             global conversion_cancelled
             conversion_cancelled.set()
             logger.info("Cancel button clicked, cancellation flag set")
+            
+            # Try to join the thread with a timeout
+            if thread is not None:
+                logger.info(f"Attempting to join conversion thread: {thread}")
+                thread.join(timeout=0.5)
+                if thread.is_alive():
+                    logger.warning("Thread did not finish within timeout")
+            
             # Add immediate feedback to the user
-            return gr.update(visible=True), gr.update(visible=False), True
+            return gr.update(visible=True), gr.update(visible=False), True, None
 
         # Start conversion sequence
         convert_button.click(
@@ -242,14 +288,14 @@ def create_ui():
         ).then(
             fn=handle_convert,
             inputs=[file_input, provider_dropdown, ocr_dropdown, output_format, cancel_requested],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button]
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button, conversion_thread]
         )
         
         # Handle cancel button click
         cancel_button.click(
             fn=request_cancellation,
-            inputs=[],
-            outputs=[convert_button, cancel_button, cancel_requested],
+            inputs=[conversion_thread],
+            outputs=[convert_button, cancel_button, cancel_requested, conversion_thread],
             queue=False  # Execute immediately
         )
 
