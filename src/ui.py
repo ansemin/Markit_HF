@@ -111,7 +111,7 @@ def create_ui():
                                 value=default_parser,
                                 interactive=True
                             )
-                        with gr.Column(scale=3):
+                        with gr.Column(scale=1):
                             default_ocr_options = ParserRegistry.get_ocr_options(default_parser)
                             default_ocr = default_ocr_options[0] if default_ocr_options else "No OCR"
                             
