@@ -1,7 +1,6 @@
 from typing import Optional, Dict, Any, Union
 from pathlib import Path
 import threading
-from docling.datamodel.document import Document
 
 from parser_interface import DocumentParser
 from parser_registry import ParserRegistry
@@ -64,42 +63,3 @@ class ParserFactory:
         # Parse the document, passing the cancellation flag
         kwargs['cancellation_flag'] = cancellation_flag
         return parser.parse(file_path, ocr_method=ocr_method_id, **kwargs) 
-
-class BaseParser:
-    def __init__(self):
-        self._cancellation_check = lambda: False
-    
-    def set_cancellation_check(self, check_func):
-        """Set a function that will be called to check for cancellation."""
-        self._cancellation_check = check_func
-    
-    def is_cancelled(self):
-        """Check if processing should be cancelled."""
-        return self._cancellation_check()
-    
-    def parse(self, file_path):
-        """Parse the file and return the content."""
-        # Initialize document
-        document = Document()
-        
-        # Check for cancellation
-        if self.is_cancelled():
-            return document
-        
-        # Open the file
-        # ...
-        
-        # Process each page
-        for page_num in range(num_pages):
-            # Check for cancellation before processing each page
-            if self.is_cancelled():
-                return document
-            
-            # Process page
-            # ...
-            
-            # Check for cancellation after processing each page
-            if self.is_cancelled():
-                return document
-        
-        return document
