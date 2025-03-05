@@ -19,3 +19,5 @@ pdf2image>=1.16.0  # For PDF processing
 dill==0.3.8  # Downgraded to be compatible with datasets
 # Gemini API client
 google-genai>=0.1.0
+# Environment variables
+python-dotenv>=1.0.0

@@ -12,20 +12,25 @@ from src.parsers.parser_registry import ParserRegistry
 
 # Import the Google Gemini API client
 try:
-    from google import genai
-    from google.genai import types
+    import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
 
+# Load API key from environment variable
+api_key = os.getenv("GOOGLE_API_KEY")
+
+# Check if API key is available and print a message if not
+if not api_key:
+    print("Warning: GOOGLE_API_KEY environment variable not found. Gemini Flash parser may not work.")
 
 class GeminiFlashParser(DocumentParser):
-    """Parser implementation using Gemini Flash 2.0."""
-    
+    """Parser that uses Google's Gemini Flash 2.0 to convert documents to markdown."""
+
     @classmethod
     def get_name(cls) -> str:
         return "Gemini Flash"
-    
+
     @classmethod
     def get_supported_ocr_methods(cls) -> List[Dict[str, Any]]:
         return [
@@ -48,124 +53,88 @@ class GeminiFlashParser(DocumentParser):
                 "Please install it with 'pip install google-genai'."
             )
         
-        # Get API key from environment variable
-        api_key = os.getenv("GOOGLE_API_KEY")
+        # Use the globally loaded API key
         if not api_key:
             raise ValueError(
                 "GOOGLE_API_KEY environment variable is not set. "
                 "Please set it to your Gemini API key."
             )
         
-        # Initialize the Gemini client
-        client = genai.Client(api_key=api_key)
-        
-        # Determine file type based on extension
-        file_path = Path(file_path)
-        file_extension = file_path.suffix.lower()
-        
-        # Read the file content
-        file_content = file_path.read_bytes()
-        
-        # Determine MIME type based on file extension
-        mime_type = self._get_mime_type(file_extension)
-        
-        # Create system prompt for document conversion
-        system_prompt = (
-            "You are an expert document converter that transforms documents into well-formatted markdown. "
-            "Preserve the original structure, formatting, and content as accurately as possible. "
-            "Include headers, lists, tables, and other formatting elements appropriately in markdown syntax. "
-            "Ignore watermarks, page numbers, and other non-content elements."
-        )
-        
-        # Create user prompt for document conversion
-        user_prompt = "Convert the following document to markdown (.md file) format, preserving its structure and formatting."
-        
         try:
-            # For smaller files (< 20MB), use inline data
-            if len(file_content) < 20 * 1024 * 1024:  # 20MB
-                # Create a Part object from the file content
-                file_part = types.Part.from_bytes(data=file_content, mime_type=mime_type)
-                
-                # Generate content with the updated format
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=[
-                        system_prompt,
-                        [file_part, user_prompt]
-                    ]
-                )
-            else:
-                # For larger files, use the File API
-                uploaded_file = client.files.upload(
-                    file=io.BytesIO(file_content),
-                    config=dict(mime_type=mime_type)
-                )
-                
-                # Generate content with the updated format
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=[
-                        system_prompt,
-                        [uploaded_file, user_prompt]
-                    ]
-                )
+            # Configure the Gemini API with the API key
+            genai.configure(api_key=api_key)
             
-            # Format the content based on the requested output format
-            output_format = kwargs.get("output_format", "markdown")
-            content = response.text
+            # Determine file type based on extension
+            file_path = Path(file_path)
+            file_extension = file_path.suffix.lower()
             
-            if output_format.lower() == "json":
-                return json.dumps({"content": content}, ensure_ascii=False, indent=2)
-            elif output_format.lower() == "text":
-                # Remove markdown formatting for plain text
-                return content.replace("#", "").replace("*", "").replace("_", "")
-            elif output_format.lower() == "document_tags":
-                return f"<doc>\n{content}\n</doc>"
-            else:
-                return content
-                
+            # Read the file content
+            file_content = file_path.read_bytes()
+            
+            # Determine MIME type based on file extension
+            mime_type = self._get_mime_type(file_extension)
+            
+            # Create a multipart content with the file
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            
+            # Set up the prompt
+            prompt = """
+            Convert this document to markdown format. 
+            Preserve the structure, headings, lists, tables, and formatting as much as possible.
+            For images, include a brief description in markdown image syntax.
+            """
+            
+            # Generate the response
+            response = model.generate_content(
+                contents=[
+                    prompt,
+                    {
+                        "mime_type": mime_type,
+                        "data": file_content
+                    }
+                ],
+                generation_config={
+                    "temperature": 0.2,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 8192,
+                }
+            )
+            
+            # Extract the markdown text from the response
+            markdown_text = response.text
+            
+            return markdown_text
+            
         except Exception as e:
-            raise Exception(f"Error processing document with Gemini Flash: {str(e)}")
+            error_message = f"Error parsing document with Gemini Flash: {str(e)}"
+            print(error_message)
+            return f"# Error\n\n{error_message}\n\nPlease check your API key and try again."
     
     def _get_mime_type(self, file_extension: str) -> str:
-        """Get the MIME type based on file extension."""
+        """Get the MIME type for a file extension."""
         mime_types = {
             ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".doc": "application/msword",
+            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".ppt": "application/vnd.ms-powerpoint",
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".xls": "application/vnd.ms-excel",
             ".txt": "text/plain",
+            ".md": "text/markdown",
             ".html": "text/html",
             ".htm": "text/html",
-            ".xml": "text/xml",
-            ".csv": "text/csv",
-            ".md": "text/markdown",
-            ".rtf": "text/rtf",
-            ".js": "application/javascript",
-            ".py": "text/x-python",
             ".jpg": "image/jpeg",
             ".jpeg": "image/jpeg",
             ".png": "image/png",
             ".gif": "image/gif",
             ".bmp": "image/bmp",
-            ".webp": "image/webp",
             ".tiff": "image/tiff",
             ".tif": "image/tiff",
-            # Add support for Office documents
-            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".xls": "application/vnd.ms-excel",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".doc": "application/msword",
-            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            ".ppt": "application/vnd.ms-powerpoint",
-            # Add support for other common document types
-            ".json": "application/json",
-            ".yaml": "application/x-yaml",
-            ".yml": "application/x-yaml",
-            ".tex": "application/x-tex",
-            ".odt": "application/vnd.oasis.opendocument.text",
-            ".ods": "application/vnd.oasis.opendocument.spreadsheet",
-            ".odp": "application/vnd.oasis.opendocument.presentation",
         }
         
-        return mime_types.get(file_extension, "application/pdf")  # Default to PDF if unknown
+        return mime_types.get(file_extension, "application/octet-stream")
 
 
 # Register the parser with the registry

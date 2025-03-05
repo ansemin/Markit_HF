@@ -5,12 +5,29 @@ import shutil
 from pathlib import Path
 import urllib.request
 
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("Loaded environment variables from .env file")
+except ImportError:
+    print("python-dotenv not installed, skipping .env file loading")
+
 # Set TESSDATA_PREFIX if not already set
 if not os.environ.get('TESSDATA_PREFIX'):
     tessdata_dir = "/usr/share/tesseract-ocr/4.00/tessdata"
     if os.path.exists(tessdata_dir):
         os.environ['TESSDATA_PREFIX'] = tessdata_dir
         print(f"Set TESSDATA_PREFIX to {tessdata_dir}")
+
+# Load Gemini API key from environment variable
+gemini_api_key = os.getenv("GOOGLE_API_KEY")
+
+# Check if API key is available and print a message if not
+if not gemini_api_key:
+    print("Warning: GOOGLE_API_KEY environment variable not found. Gemini Flash parser may not work.")
+else:
+    print(f"Found Gemini API key: {gemini_api_key[:5]}...{gemini_api_key[-5:] if len(gemini_api_key) > 10 else ''}")
 
 # Get the current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,41 +53,28 @@ except ModuleNotFoundError:
         # Try import again
         from src.main import main
 
-# Set up Tesseract environment
+# Function to setup Tesseract
 def setup_tesseract():
+    """Setup Tesseract OCR environment."""
     # Create tessdata directory if it doesn't exist
-    tessdata_dir = os.path.join(os.getcwd(), "tessdata")
+    tessdata_dir = os.path.join(current_dir, "tessdata")
     os.makedirs(tessdata_dir, exist_ok=True)
     
-    # Set TESSDATA_PREFIX environment variable
-    os.environ["TESSDATA_PREFIX"] = tessdata_dir
-    print(f"TESSDATA_PREFIX set to: {os.environ.get('TESSDATA_PREFIX')}")
+    # Set TESSDATA_PREFIX environment variable if not already set
+    if not os.environ.get('TESSDATA_PREFIX'):
+        os.environ['TESSDATA_PREFIX'] = tessdata_dir
+        print(f"Set TESSDATA_PREFIX to {tessdata_dir}")
     
-    # Check if eng.traineddata exists, if not download it
+    # Download eng.traineddata if it doesn't exist
     eng_traineddata = os.path.join(tessdata_dir, "eng.traineddata")
     if not os.path.exists(eng_traineddata):
-        print("Downloading eng.traineddata...")
-        url = "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"
         try:
+            print("Downloading eng.traineddata...")
+            url = "https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata"
             urllib.request.urlretrieve(url, eng_traineddata)
-            print(f"Successfully downloaded eng.traineddata to {eng_traineddata}")
+            print("Downloaded eng.traineddata")
         except Exception as e:
-            print(f"Failed to download eng.traineddata: {e}")
-    else:
-        print(f"eng.traineddata already exists at {eng_traineddata}")
-    
-    # Also check system location as a fallback
-    system_tessdata = "/usr/local/share/tessdata"
-    if os.path.exists(system_tessdata):
-        print(f"System tessdata directory exists at {system_tessdata}")
-        # Copy eng.traineddata to system location if it doesn't exist there
-        system_eng_traineddata = os.path.join(system_tessdata, "eng.traineddata")
-        if not os.path.exists(system_eng_traineddata) and os.path.exists(eng_traineddata):
-            try:
-                shutil.copy(eng_traineddata, system_eng_traineddata)
-                print(f"Copied eng.traineddata to {system_eng_traineddata}")
-            except Exception as e:
-                print(f"Failed to copy eng.traineddata to system location: {e}")
+            print(f"Error downloading eng.traineddata: {e}")
 
 # Call setup function at import time
 setup_tesseract()

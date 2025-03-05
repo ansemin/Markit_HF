@@ -33,7 +33,7 @@ pip install -e .
 ### Gemini Flash Parser
 To use the Gemini Flash parser, you need to:
 1. Install the Google Gemini API client: `pip install google-genai`
-2. Set the `GOOGLE_API_KEY` environment variable with your Gemini API key
+2. Set the `GOOGLE_API_KEY` or `GOOGLE_GENAI_API_KEY` environment variable with your Gemini API key
    ```bash
    # On Windows
    set GOOGLE_API_KEY=your_api_key_here
@@ -42,6 +42,19 @@ To use the Gemini Flash parser, you need to:
    export GOOGLE_API_KEY=your_api_key_here
    ```
 3. You can obtain a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+## Setting up in Hugging Face Spaces
+
+When deploying to Hugging Face Spaces, you need to set up the environment variables for the Gemini API key:
+
+1. Go to your Space settings page: `https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME/settings`
+2. In the "Repository secrets" section, add a new secret:
+   - Name: `GOOGLE_GENAI_API_KEY`
+   - Value: Your Gemini API key from Google AI Studio
+3. Save the secret
+4. Restart your Space
+
+This will make the API key available to the application as an environment variable.
 
 ## How to Use
 
@@ -69,6 +82,24 @@ To use the Gemini Flash parser, you need to:
 
 ## Technical Details
 This application is built with Python using Gradio for the web interface. It leverages various document parsing libraries to handle different document formats and extraction methods.
+
+## Troubleshooting
+
+### Gemini Flash Parser Issues
+
+If you encounter errors with the Gemini Flash parser, check the following:
+
+1. Make sure the `GOOGLE_GENAI_API_KEY` secret is set in your Hugging Face Space settings
+2. Verify that the API key is valid and has access to the Gemini API
+3. Check the Space logs for any error messages related to the API key or the Gemini API
+
+### Gradio Interface Issues
+
+If you encounter errors with the Gradio interface, try the following:
+
+1. Restart your Space
+2. Check the Space logs for any error messages
+3. Make sure all required packages are installed
 
 ## Credits
 Developed as an open-source tool for document conversion and analysis.
