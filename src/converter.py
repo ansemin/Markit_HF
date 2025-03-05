@@ -39,11 +39,8 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     if not file_path:
         return "Please upload a file.", None
 
-    # Check for cancellation
-    if conversion_cancelled and conversion_cancelled.is_set():
-        return "Conversion cancelled.", None
-
     # Create a temporary file with English filename
+    temp_input = None
     try:
         original_ext = Path(file_path).suffix
         with tempfile.NamedTemporaryFile(suffix=original_ext, delete=False) as temp_input:
@@ -51,92 +48,64 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             with open(file_path, 'rb') as original:
                 temp_input.write(original.read())
         file_path = temp_input.name
-    except Exception as e:
-        return f"Error creating temporary file: {e}", None
 
-    # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
-        # Clean up temp file
-        try:
-            os.unlink(temp_input.name)
-        except:
-            pass
-        return "Conversion cancelled.", None
+        # Early cancellation check
+        if conversion_cancelled and conversion_cancelled.is_set():
+            cleanup_temp_file(temp_input.name)
+            return "Conversion cancelled.", None
 
-    try:
         # Use the parser factory to parse the document
         start = time.time()
-        
-        # We need to modify the parsing process to check for cancellation
-        # This requires changes to the parser implementation, but we can add a hook here
-        
-        # Pass the cancellation flag to the parser factory
         content = ParserFactory.parse_document(
             file_path=file_path,
             parser_name=parser_name,
             ocr_method_name=ocr_method_name,
             output_format=output_format.lower(),
-            cancellation_flag=conversion_cancelled  # Pass the flag to parsers
+            cancellation_flag=conversion_cancelled
         )
         
+        # If conversion was cancelled during parsing
+        if conversion_cancelled and conversion_cancelled.is_set():
+            cleanup_temp_file(temp_input.name)
+            return "Conversion cancelled.", None
+
         duration = time.time() - start
         logging.info(f"Processed in {duration:.2f} seconds.")
-        
-        # Check for cancellation after processing
-        if conversion_cancelled and conversion_cancelled.is_set():
-            # Clean up temp file
-            try:
-                os.unlink(temp_input.name)
-            except:
-                pass
-            return "Conversion cancelled.", None
-            
-    except Exception as e:
-        # Clean up temp file
-        try:
-            os.unlink(temp_input.name)
-        except:
-            pass
-        return f"Error: {e}", None
 
-    # Determine the file extension based on the output format
-    if output_format == "Markdown":
-        ext = ".md"
-    elif output_format == "JSON":
-        ext = ".json"
-    elif output_format == "Text":
-        ext = ".txt"
-    elif output_format == "Document Tags":
-        ext = ".doctags"
-    else:
-        ext = ".txt"
+        # Determine output file extension
+        ext = get_output_extension(output_format)
 
-    # Check for cancellation again
-    if conversion_cancelled and conversion_cancelled.is_set():
-        # Clean up temp file
-        try:
-            os.unlink(temp_input.name)
-        except:
-            pass
-        return "Conversion cancelled.", None
-
-    try:
-        # Create a temporary file for download
+        # Create download file
         with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False, encoding="utf-8") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
-        
-        # Clean up the temporary input file
-        try:
-            os.unlink(temp_input.name)
-        except:
-            pass
-            
+
+        # Cleanup and return
+        cleanup_temp_file(temp_input.name)
         return content, tmp_path
+
     except Exception as e:
-        # Clean up temp file
-        try:
-            os.unlink(temp_input.name)
-        except:
-            pass
+        if temp_input and temp_input.name:
+            cleanup_temp_file(temp_input.name)
         return f"Error: {e}", None
+
+
+def cleanup_temp_file(file_path):
+    """Helper function to clean up temporary files"""
+    try:
+        os.unlink(file_path)
+    except:
+        pass
+
+
+def get_output_extension(output_format):
+    """Helper function to get the appropriate file extension"""
+    if output_format == "Markdown":
+        return ".md"
+    elif output_format == "JSON":
+        return ".json"
+    elif output_format == "Text":
+        return ".txt"
+    elif output_format == "Document Tags":
+        return ".doctags"
+    return ".txt"

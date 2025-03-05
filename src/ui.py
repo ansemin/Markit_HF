@@ -63,24 +63,21 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format):
     """Handle file conversion."""
     global conversion_cancelled
     
-    # Check if cancelled
-    if conversion_cancelled.is_set():
-        conversion_cancelled.clear()
-        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=False)
-    
-    # Perform the conversion
-    content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
-    
-    # Check if cancelled after conversion
-    if conversion_cancelled.is_set():
-        conversion_cancelled.clear()
-        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=False)
-    
-    # Process results
-    pages = split_content_into_pages(str(content))
-    page_info = f"Page 1/{len(pages)}"
-    
-    return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=False)
+    try:
+        # Perform the conversion
+        content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+        
+        # If conversion was cancelled, return early
+        if content == "Conversion cancelled.":
+            return content, None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+        
+        # Process results
+        pages = split_content_into_pages(str(content))
+        page_info = f"Page 1/{len(pages)}"
+        
+        return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
+    except Exception as e:
+        return f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
 
 
 def handle_page_navigation(direction, current, pages):
@@ -107,7 +104,7 @@ def create_ui():
         .page-info { display: inline-block; margin: 0 1rem; }
         .processing-controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
     """) as demo:
-        gr.Markdown("Doc2Md: Convert any documents to Markdown")
+        gr.Markdown("Markit: Convert any documents to Markdown")
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
@@ -177,25 +174,24 @@ def create_ui():
             outputs=[ocr_dropdown]
         )
 
-        # Show cancel button when conversion starts
+        # Show/hide appropriate buttons when conversion starts
         convert_button.click(
-            lambda: gr.update(visible=True),
+            fn=lambda: (gr.update(visible=False), gr.update(visible=True)),
             inputs=[],
-            outputs=[cancel_button]
-        )
-        
-        # Main conversion process
-        convert_button.click(
+            outputs=[convert_button, cancel_button],
+            queue=False  # Execute immediately
+        ).then(  # Chain the conversion process after button update
             fn=handle_convert,
             inputs=[file_input, provider_dropdown, ocr_dropdown, output_format],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, cancel_button]
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button]
         )
         
         # Handle cancel button click
         cancel_button.click(
-            fn=cancel_conversion,
+            fn=lambda: (gr.update(visible=True), gr.update(visible=False)),
             inputs=[],
-            outputs=[cancel_button]
+            outputs=[convert_button, cancel_button],
+            queue=False  # Execute immediately
         )
 
         prev_btn.click(
