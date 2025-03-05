@@ -5,6 +5,7 @@ import time
 from converter import convert_file, set_cancellation_flag
 from docling_chat import chat_with_document
 from parser_registry import ParserRegistry
+import logging
 
 
 # Add a global variable to track cancellation state
@@ -91,9 +92,12 @@ def handle_page_navigation(direction, current, pages):
 
 
 def cancel_conversion():
-    """Set the cancellation flag."""
+    """Set the cancellation flag and force UI update."""
     global conversion_cancelled
+    # Set the flag
     conversion_cancelled.set()
+    logging.info("Cancel button clicked, flag set")
+    # Update UI immediately to show cancellation is in progress
     return gr.update(visible=False)
 
 
