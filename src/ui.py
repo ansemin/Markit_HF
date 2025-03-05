@@ -1,5 +1,7 @@
 import gradio as gr
 import markdown
+import threading
+import time
 from converter import convert_file
 from docling_chat import chat_with_document
 from parser_registry import ParserRegistry
@@ -74,8 +76,7 @@ def create_ui():
         .page-navigation { text-align: center; margin-top: 1rem; }
         .page-navigation button { margin: 0 0.5rem; }
         .page-info { display: inline-block; margin: 0 1rem; }
-        .processing-indicator { display: flex; align-items: center; gap: 10px; }
-        .cancel-btn { background-color: #ff4d4f; color: white; }
+        .processing-controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
     """) as demo:
         gr.Markdown("Doc2Md: Convert any documents to Markdown")
 
@@ -98,14 +99,14 @@ def create_ui():
                 
                 file_download = gr.File(label="Download File")
                 
-                # Add processing indicator and cancel button
-                with gr.Row(visible=False) as processing_row:
-                    with gr.Column(scale=3):
-                        processing_indicator = gr.Markdown("Processing document... This may take a while.", elem_classes=["processing-indicator"])
-                    with gr.Column(scale=1):
-                        cancel_btn = gr.Button("Cancel", elem_classes=["cancel-btn"])
+                # Processing controls row
+                with gr.Row(elem_classes=["processing-controls"]) as processing_controls:
+                    convert_button = gr.Button("Convert", variant="primary")
+                    # Cancel button that will only be visible during processing
+                    cancel_button = gr.Button("Cancel", variant="stop", visible=False)
                 
-                convert_button = gr.Button("Convert")
+                # Add a progress indicator
+                progress = gr.Progress()
 
             with gr.Tab("Config ⚙️"):
                 with gr.Group(elem_classes=["settings-group"]):
@@ -151,37 +152,45 @@ def create_ui():
             outputs=[ocr_dropdown]
         )
 
-        def start_processing():
-            return gr.update(visible=True), gr.update(interactive=False)
-        
-        def end_processing():
-            return gr.update(visible=False), gr.update(interactive=True)
-        
+        # Update the convert button click handler to be cancellable and show/hide the cancel button
+        def start_conversion(file_path, parser_name, ocr_method_name, output_format, progress=gr.Progress()):
+            # Show cancel button when processing starts
+            yield "", None, [], 1, "Processing...", gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)
+            
+            # Simulate progress updates (this will be replaced by actual progress from converter)
+            for i in range(10):
+                # Check if the task has been cancelled
+                if progress.cancelled:
+                    yield "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+                    return
+                
+                progress(i/10, desc=f"Processing document ({i*10}%)")
+                time.sleep(0.2)  # Simulate work
+            
+            # Actual conversion
+            try:
+                content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+                pages = split_content_into_pages(str(content))
+                page_info = f"Page 1/{len(pages)}"
+                
+                # Return results and update UI
+                yield str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
+            except Exception as e:
+                yield f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+
         convert_button.click(
-            fn=start_processing,
-            inputs=None,
-            outputs=[processing_row, convert_button],
-            queue=False
-        ).then(
-            fn=handle_convert,
+            fn=start_conversion,
             inputs=[file_input, provider_dropdown, ocr_dropdown, output_format],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row]
-        ).then(
-            fn=end_processing,
-            inputs=None,
-            outputs=[processing_row, convert_button]
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button],
+            cancellable=True,  # Make this operation cancellable
         )
         
-        # Add cancel button functionality
-        cancel_btn.click(
-            fn=lambda: None,
-            inputs=None,
-            outputs=None,
-            cancels=[convert_button]
-        ).then(
-            fn=end_processing,
-            inputs=None,
-            outputs=[processing_row, convert_button]
+        # When cancel button is clicked, it should reset the UI
+        cancel_button.click(
+            fn=lambda: ("Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)),
+            inputs=[],
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button],
+            cancels=["convert"]  # This will cancel the running convert task
         )
 
         prev_btn.click(
