@@ -2,6 +2,7 @@ import tempfile
 import logging
 import time
 import os
+import threading
 from pathlib import Path
 
 # Use relative imports instead of absolute imports
@@ -9,6 +10,15 @@ from parser_factory import ParserFactory
 
 # Import all parsers to ensure they're registered
 import parsers
+
+# Reference to the cancellation flag from ui.py
+# This will be set by the UI when the cancel button is clicked
+conversion_cancelled = None
+
+def set_cancellation_flag(flag):
+    """Set the reference to the cancellation flag from ui.py"""
+    global conversion_cancelled
+    conversion_cancelled = flag
 
 
 def convert_file(file_path, parser_name, ocr_method_name, output_format):
@@ -24,8 +34,14 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     Returns:
         tuple: (content, download_file_path)
     """
+    global conversion_cancelled
+    
     if not file_path:
         return "Please upload a file.", None
+
+    # Check for cancellation
+    if conversion_cancelled and conversion_cancelled.is_set():
+        return "Conversion cancelled.", None
 
     # Create a temporary file with English filename
     try:
@@ -38,18 +54,49 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
     except Exception as e:
         return f"Error creating temporary file: {e}", None
 
+    # Check for cancellation again
+    if conversion_cancelled and conversion_cancelled.is_set():
+        # Clean up temp file
+        try:
+            os.unlink(temp_input.name)
+        except:
+            pass
+        return "Conversion cancelled.", None
+
     try:
         # Use the parser factory to parse the document
         start = time.time()
+        
+        # We need to modify the parsing process to check for cancellation
+        # This requires changes to the parser implementation, but we can add a hook here
+        
+        # Pass the cancellation flag to the parser factory
         content = ParserFactory.parse_document(
             file_path=file_path,
             parser_name=parser_name,
             ocr_method_name=ocr_method_name,
-            output_format=output_format.lower()
+            output_format=output_format.lower(),
+            cancellation_flag=conversion_cancelled  # Pass the flag to parsers
         )
+        
         duration = time.time() - start
         logging.info(f"Processed in {duration:.2f} seconds.")
+        
+        # Check for cancellation after processing
+        if conversion_cancelled and conversion_cancelled.is_set():
+            # Clean up temp file
+            try:
+                os.unlink(temp_input.name)
+            except:
+                pass
+            return "Conversion cancelled.", None
+            
     except Exception as e:
+        # Clean up temp file
+        try:
+            os.unlink(temp_input.name)
+        except:
+            pass
         return f"Error: {e}", None
 
     # Determine the file extension based on the output format
@@ -63,6 +110,15 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
         ext = ".doctags"
     else:
         ext = ".txt"
+
+    # Check for cancellation again
+    if conversion_cancelled and conversion_cancelled.is_set():
+        # Clean up temp file
+        try:
+            os.unlink(temp_input.name)
+        except:
+            pass
+        return "Conversion cancelled.", None
 
     try:
         # Create a temporary file for download
@@ -78,4 +134,9 @@ def convert_file(file_path, parser_name, ocr_method_name, output_format):
             
         return content, tmp_path
     except Exception as e:
+        # Clean up temp file
+        try:
+            os.unlink(temp_input.name)
+        except:
+            pass
         return f"Error: {e}", None

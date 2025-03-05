@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, Union
 from pathlib import Path
+import threading
 
 from parser_interface import DocumentParser
 from parser_registry import ParserRegistry
@@ -30,7 +31,8 @@ class ParserFactory:
     def parse_document(cls, 
                       file_path: Union[str, Path], 
                       parser_name: str, 
-                      ocr_method_name: str, 
+                      ocr_method_name: str,
+                      cancellation_flag: Optional[threading.Event] = None,
                       **kwargs) -> str:
         """
         Parse a document using the specified parser and OCR method.
@@ -39,6 +41,7 @@ class ParserFactory:
             file_path: Path to the document
             parser_name: Name of the parser to use
             ocr_method_name: Display name of the OCR method to use
+            cancellation_flag: Optional flag to check for cancellation
             **kwargs: Additional parser-specific options
             
         Returns:
@@ -53,5 +56,10 @@ class ParserFactory:
         if not ocr_method_id:
             raise ValueError(f"Unknown OCR method: {ocr_method_name} for parser {parser_name}")
         
-        # Parse the document
+        # Check for cancellation
+        if cancellation_flag and cancellation_flag.is_set():
+            return "Conversion cancelled."
+        
+        # Parse the document, passing the cancellation flag
+        kwargs['cancellation_flag'] = cancellation_flag
         return parser.parse(file_path, ocr_method=ocr_method_id, **kwargs) 
