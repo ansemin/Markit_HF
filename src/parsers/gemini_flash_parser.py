@@ -49,7 +49,7 @@ class GeminiFlashParser(DocumentParser):
             )
         
         # Get API key from environment variable
-        api_key = os.environ.get("GOOGLE_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError(
                 "GOOGLE_API_KEY environment variable is not set. "
