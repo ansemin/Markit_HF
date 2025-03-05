@@ -21,3 +21,5 @@ dill==0.3.8  # Downgraded to be compatible with datasets
 google-genai>=0.1.0
 # Environment variables
 python-dotenv>=1.0.0
+# Fix for Gradio/FastAPI/Pydantic compatibility issue
+pydantic<2.0.0
