@@ -7,6 +7,9 @@ from docling_chat import chat_with_document
 from parser_registry import ParserRegistry
 
 
+# Add a global variable to track cancellation state
+conversion_cancelled = threading.Event()
+
 def format_markdown_content(content):
     if not content:
         return content
@@ -80,6 +83,9 @@ def create_ui():
     """) as demo:
         gr.Markdown("Doc2Md: Convert any documents to Markdown")
 
+        # Add a state to track if conversion is in progress
+        is_converting = gr.State(False)
+
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
                 file_input = gr.File(label="Upload PDF", type="filepath")
@@ -106,7 +112,7 @@ def create_ui():
                     cancel_button = gr.Button("Cancel", variant="stop", visible=False)
                 
                 # Add a progress indicator
-                progress = gr.Progress()
+                progress_indicator = gr.Markdown("", visible=False)
 
             with gr.Tab("Config ⚙️"):
                 with gr.Group(elem_classes=["settings-group"]):
@@ -152,45 +158,51 @@ def create_ui():
             outputs=[ocr_dropdown]
         )
 
-        # Update the convert button click handler to be cancellable and show/hide the cancel button
-        def start_conversion(file_path, parser_name, ocr_method_name, output_format, progress=gr.Progress()):
-            # Show cancel button when processing starts
-            yield "", None, [], 1, "Processing...", gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)
+        # Function to handle conversion with progress updates
+        def start_conversion(file_path, parser_name, ocr_method_name, output_format, converting):
+            global conversion_cancelled
             
-            # Simulate progress updates (this will be replaced by actual progress from converter)
-            for i in range(10):
-                # Check if the task has been cancelled
-                if progress.cancelled:
-                    yield "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+            # Reset cancellation flag
+            conversion_cancelled.clear()
+            
+            # Show progress indicator and cancel button
+            yield "", None, [], 1, "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True, value="Processing document..."), True
+            
+            try:
+                # Actual conversion
+                content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+                
+                # Check if cancelled during conversion
+                if conversion_cancelled.is_set():
+                    yield "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), False
                     return
                 
-                progress(i/10, desc=f"Processing document ({i*10}%)")
-                time.sleep(0.2)  # Simulate work
-            
-            # Actual conversion
-            try:
-                content, download_file = convert_file(file_path, parser_name, ocr_method_name, output_format)
+                # Process results
                 pages = split_content_into_pages(str(content))
                 page_info = f"Page 1/{len(pages)}"
                 
                 # Return results and update UI
-                yield str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
+                yield str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), False
+            
             except Exception as e:
-                yield f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+                yield f"Error: {str(e)}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), False
+
+        # Function to handle cancellation
+        def cancel_conversion():
+            global conversion_cancelled
+            conversion_cancelled.set()
+            return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), False
 
         convert_button.click(
             fn=start_conversion,
-            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button],
-            cancellable=True,  # Make this operation cancellable
+            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format, is_converting],
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button, progress_indicator, is_converting]
         )
         
-        # When cancel button is clicked, it should reset the UI
         cancel_button.click(
-            fn=lambda: ("Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)),
+            fn=cancel_conversion,
             inputs=[],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button],
-            cancels=["convert"]  # This will cancel the running convert task
+            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button, progress_indicator, is_converting]
         )
 
         prev_btn.click(
