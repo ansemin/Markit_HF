@@ -1,7 +1,9 @@
-# Import all parsers to ensure they register themselves
-from parsers.pypdfium_parser import PyPdfiumParser
-from parsers.docling_parser import DoclingParser
-from parsers.marker_parser import MarkerParser
+"""Parser implementations for document conversion."""
+
+# Import all parsers to ensure they're registered
+from src.parsers.docling_parser import DoclingParser
+from src.parsers.marker_parser import MarkerParser
+from src.parsers.pypdfium_parser import PyPdfiumParser
 
 # You can add new parsers here in the future 
 

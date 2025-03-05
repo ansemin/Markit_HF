@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # Use relative imports instead of absolute imports
-from parser_factory import ParserFactory
+from src.core.parser_factory import ParserFactory
 
 # Import all parsers to ensure they're registered
 import parsers

@@ -1,9 +1,12 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
+import subprocess
+import tempfile
+import os
 import json
 
-from parser_interface import DocumentParser
-from parser_registry import ParserRegistry
+from src.parsers.parser_interface import DocumentParser
+from src.parsers.parser_registry import ParserRegistry
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 from marker.output import text_from_rendered

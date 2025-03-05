@@ -4,8 +4,8 @@ import threading
 import logging
 import time
 
-from parser_interface import DocumentParser
-from parser_registry import ParserRegistry
+from src.parsers.parser_interface import DocumentParser
+from src.parsers.parser_registry import ParserRegistry
 
 
 class ParserFactory:

@@ -82,3 +82,39 @@ build:
 ## Development
 
 For local development, ensure you have Tesseract OCR installed and the TESSDATA_PREFIX environment variable set correctly.
+
+## Recommended Folder Structure
+
+```
+markit/
+├── app.py                  # Main application entry point
+├── setup.sh                # Setup script
+├── build.sh                # Build script
+├── requirements.txt        # Python dependencies
+├── README.md               # Project documentation
+├── .env                    # Environment variables
+├── .gitignore              # Git ignore file
+├── .gitattributes          # Git attributes file
+├── src/                    # Source code
+│   ├── __init__.py         # Package initialization
+│   ├── main.py             # Main module
+│   ├── core/               # Core functionality
+│   │   ├── __init__.py     # Package initialization
+│   │   ├── converter.py    # Document conversion logic
+│   │   └── parser_factory.py # Parser factory
+│   ├── parsers/            # Parser implementations
+│   │   ├── __init__.py     # Package initialization
+│   │   ├── parser_interface.py # Parser interface
+│   │   ├── parser_registry.py # Parser registry
+│   │   ├── docling_parser.py # Docling parser
+│   │   ├── marker_parser.py # Marker parser
+│   │   └── pypdfium_parser.py # PyPDFium parser
+│   ├── ui/                 # User interface
+│   │   ├── __init__.py     # Package initialization
+│   │   └── ui.py           # Gradio UI implementation
+│   └── services/           # External services
+│       ├── __init__.py     # Package initialization
+│       └── docling_chat.py # Chat service
+└── tests/                  # Tests
+    └── __init__.py         # Package initialization
+```

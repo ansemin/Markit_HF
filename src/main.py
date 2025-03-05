@@ -1,6 +1,6 @@
 import parsers  # Import all parsers to ensure they're registered
 
-from ui import launch_ui
+from src.ui.ui import launch_ui
 
 
 def main():

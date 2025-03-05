@@ -3,9 +3,9 @@ import markdown
 import threading
 import time
 import logging
-from converter import convert_file, set_cancellation_flag, is_conversion_in_progress
-from docling_chat import chat_with_document
-from parser_registry import ParserRegistry
+from src.core.converter import convert_file, set_cancellation_flag, is_conversion_in_progress
+from src.services.docling_chat import chat_with_document
+from src.parsers.parser_registry import ParserRegistry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 import json
 
-from parser_interface import DocumentParser
-from parser_registry import ParserRegistry
+from src.parsers.parser_interface import DocumentParser
+from src.parsers.parser_registry import ParserRegistry
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (

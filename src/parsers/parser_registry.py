@@ -1,5 +1,5 @@
 from typing import Dict, List, Type, Any, Optional
-from parser_interface import DocumentParser
+from src.parsers.parser_interface import DocumentParser
 
 
 class ParserRegistry:
