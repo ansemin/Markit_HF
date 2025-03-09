@@ -123,6 +123,30 @@ class DoclingParser(DocumentParser):
     
     def _apply_full_force_ocr(self, file_path: Union[str, Path]) -> str:
         """Apply full force OCR to a document."""
+        import subprocess
+        import os
+        
+        # Try to find tesseract binary
+        tesseract_cmd = 'tesseract'
+        try:
+            # Check if tesseract is available
+            subprocess.run([tesseract_cmd, '--version'], 
+                          stdout=subprocess.PIPE, 
+                          stderr=subprocess.PIPE, 
+                          check=True)
+        except (subprocess.SubprocessError, FileNotFoundError):
+            # Try common locations in Hugging Face environment
+            potential_paths = [
+                '/usr/bin/tesseract',
+                '/usr/local/bin/tesseract',
+                '/opt/conda/bin/tesseract'
+            ]
+            
+            for path in potential_paths:
+                if os.path.exists(path):
+                    tesseract_cmd = path
+                    break
+        
         input_doc = Path(file_path)
         
         pipeline_options = PdfPipelineOptions()
@@ -130,8 +154,21 @@ class DoclingParser(DocumentParser):
         pipeline_options.do_table_structure = True
         pipeline_options.table_structure_options.do_cell_matching = True
         
-        ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)
+        # Create OCR options with explicit tesseract path
+        ocr_options = TesseractCliOcrOptions(
+            force_full_page_ocr=True,
+            tesseract_cmd=tesseract_cmd
+        )
         pipeline_options.ocr_options = ocr_options
+        
+        # Set tessdata prefix if not already set
+        if not os.environ.get('TESSDATA_PREFIX'):
+            for prefix in ['/usr/share/tesseract-ocr/4.00/tessdata', 
+                          '/usr/share/tessdata',
+                          '/usr/local/share/tessdata']:
+                if os.path.exists(prefix):
+                    os.environ['TESSDATA_PREFIX'] = prefix
+                    break
         
         converter = DocumentConverter(
             format_options={
@@ -141,9 +178,16 @@ class DoclingParser(DocumentParser):
             }
         )
         
-        doc = converter.convert(input_doc).document
-        return doc.export_to_markdown()
+        try:
+            doc = converter.convert(input_doc).document
+            return doc.export_to_markdown()
+        except Exception as e:
+            # Provide more helpful error message
+            error_msg = str(e)
+            if "Tesseract is not available" in error_msg:
+                return f"Error: Tesseract OCR could not be found. Tried path: {tesseract_cmd}. Please ensure Tesseract is installed and in your PATH."
+            return f"Error during full force OCR: {error_msg}"
 
 
 # Register the parser with the registry
-ParserRegistry.register(DoclingParser) 
+ParserRegistry.register(DoclingParser)
