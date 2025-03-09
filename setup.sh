@@ -49,11 +49,4 @@ if [ -f "test.png" ]; then
   fi
 fi
 
-echo "Setup completed"
-
-# Add these diagnostic commands at the end of your setup.sh
-echo "Checking Tesseract location:"
-which tesseract || echo "Tesseract not found in PATH"
-whereis tesseract
-echo "Current PATH: $PATH"
-echo "TESSDATA_PREFIX: $TESSDATA_PREFIX"
+echo "Setup completed" 
