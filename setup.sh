@@ -17,19 +17,6 @@ mkdir -p tessdata
 export TESSDATA_PREFIX="$(pwd)/tessdata"
 echo "TESSDATA_PREFIX set to: $TESSDATA_PREFIX"
 
-# Enhanced Tesseract diagnostics
-echo "==== TESSERACT DIAGNOSTICS ===="
-echo "Checking Tesseract binary location:"
-which tesseract || echo "tesseract not in PATH"
-echo "Checking if binary exists at common locations:"
-ls -la /usr/bin/tesseract || echo "Not at /usr/bin/tesseract"
-ls -la /usr/local/bin/tesseract || echo "Not at /usr/local/bin/tesseract"
-echo "Checking Tesseract version:"
-tesseract --version || echo "Failed to get version"
-echo "Checking system PATH:"
-echo $PATH
-echo "==== END DIAGNOSTICS ===="
-
 # Download eng.traineddata if it doesn't exist
 if [ ! -f "tessdata/eng.traineddata" ]; then
   echo "Downloading eng.traineddata..."
@@ -45,6 +32,10 @@ if [ -d "/usr/local/share/tessdata" ]; then
   sudo cp -f tessdata/eng.traineddata /usr/local/share/tessdata/ || echo "Failed to copy to system location, continuing anyway"
 fi
 
+# Verify Tesseract installation
+echo "Verifying Tesseract installation..."
+tesseract --version || echo "Tesseract not found in PATH"
+
 # Test Tesseract functionality
 echo "Testing Tesseract functionality..."
 echo "Hello World" > test.txt
@@ -58,4 +49,4 @@ if [ -f "test.png" ]; then
   fi
 fi
 
-echo "Setup completed"
+echo "Setup completed" 
