@@ -10,12 +10,6 @@ echo "Installing Google Gemini API client..."
 pip install -q -U google-genai
 echo "Google Gemini API client installed successfully"
 
-# Find Tesseract location
-echo "Checking Tesseract location..."
-which tesseract || echo "Tesseract not found in PATH"
-echo "Tesseract binary locations:"
-find / -name tesseract -type f 2>/dev/null || echo "No tesseract binary found"
-
 # Create tessdata directory if it doesn't exist
 mkdir -p tessdata
 
@@ -42,10 +36,6 @@ fi
 echo "Verifying Tesseract installation..."
 tesseract --version || echo "Tesseract not found in PATH"
 
-# List all possible tessdata locations
-echo "Checking possible tessdata locations:"
-find / -name "tessdata" -type d 2>/dev/null || echo "No tessdata directories found"
-
 # Test Tesseract functionality
 echo "Testing Tesseract functionality..."
 echo "Hello World" > test.txt
@@ -59,4 +49,4 @@ if [ -f "test.png" ]; then
   fi
 fi
 
-echo "Setup completed"
+echo "Setup completed" 
