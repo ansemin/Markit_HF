@@ -5,10 +5,28 @@ set -e
 
 echo "Setting up Tesseract OCR environment..."
 
-# Install google-genai package
-echo "Installing Google Gemini API client..."
+# Install required packages if not already installed
+if ! command -v tesseract &> /dev/null; then
+    echo "Tesseract not found, attempting to install..."
+    apt-get update -y || echo "Failed to update apt, continuing anyway"
+    apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev libleptonica-dev || echo "Failed to install tesseract via apt, continuing anyway"
+fi
+
+# Install Python dependencies
+echo "Installing Python dependencies..."
+pip install -q -U pytesseract pillow opencv-python-headless pdf2image
 pip install -q -U google-genai
-echo "Google Gemini API client installed successfully"
+echo "Python dependencies installed successfully"
+
+# Install tesserocr with pip
+echo "Installing tesserocr..."
+pip install -q -U tesserocr || echo "Failed to install tesserocr with pip, trying with specific compiler flags..."
+
+# If tesserocr installation failed, try with specific compiler flags
+if ! python -c "import tesserocr" &> /dev/null; then
+    echo "Trying alternative tesserocr installation..."
+    CPPFLAGS="-I/usr/local/include -I/usr/include" LDFLAGS="-L/usr/local/lib -L/usr/lib" pip install -q -U tesserocr || echo "Failed to install tesserocr with compiler flags, continuing anyway"
+fi
 
 # Create tessdata directory if it doesn't exist
 mkdir -p tessdata
@@ -20,33 +38,34 @@ echo "TESSDATA_PREFIX set to: $TESSDATA_PREFIX"
 # Download eng.traineddata if it doesn't exist
 if [ ! -f "tessdata/eng.traineddata" ]; then
   echo "Downloading eng.traineddata..."
-  wget -O tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+  wget -O tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata || \
+  curl -o tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
   echo "Downloaded eng.traineddata"
 else
   echo "eng.traineddata already exists"
 fi
 
-# Also copy to system location
-if [ -d "/usr/local/share/tessdata" ]; then
-  echo "Copying eng.traineddata to system location..."
-  sudo cp -f tessdata/eng.traineddata /usr/local/share/tessdata/ || echo "Failed to copy to system location, continuing anyway"
-fi
+# Try to copy to system locations (may fail in restricted environments)
+for tessdata_dir in "/usr/share/tesseract-ocr/4.00/tessdata" "/usr/share/tesseract-ocr/tessdata" "/usr/local/share/tessdata"; do
+  if [ -d "$tessdata_dir" ]; then
+    echo "Copying eng.traineddata to $tessdata_dir..."
+    cp -f tessdata/eng.traineddata "$tessdata_dir/" 2>/dev/null || echo "Failed to copy to $tessdata_dir, continuing anyway"
+  fi
+done
 
 # Verify Tesseract installation
 echo "Verifying Tesseract installation..."
-tesseract --version || echo "Tesseract not found in PATH"
+tesseract --version || echo "Tesseract not found in PATH, but may still be available to Python"
 
-# Test Tesseract functionality
-echo "Testing Tesseract functionality..."
-echo "Hello World" > test.txt
-convert -size 100x30 xc:white -font Arial -pointsize 12 -fill black -annotate +10+20 "Hello World" test.png || echo "ImageMagick convert not available, skipping test image creation"
+# Test tesserocr if installed
+echo "Testing tesserocr..."
+python -c "import tesserocr; print(f'tesserocr version: {tesserocr.tesseract_version()}')" || echo "tesserocr not working, but may still be able to use pytesseract"
 
-if [ -f "test.png" ]; then
-  tesseract test.png test_output || echo "Tesseract test failed, but continuing"
-  if [ -f "test_output.txt" ]; then
-    echo "Tesseract test output:"
-    cat test_output.txt
-  fi
-fi
+# Test pytesseract
+echo "Testing pytesseract..."
+python -c "import pytesseract; print(f'pytesseract path: {pytesseract.tesseract_cmd}')" || echo "pytesseract not working"
 
-echo "Setup completed" 
+echo "Setup completed"
+
+# Add TESSDATA_PREFIX to .env file for persistence
+echo "TESSDATA_PREFIX=$(pwd)/tessdata" >> .env 
