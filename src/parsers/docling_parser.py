@@ -142,7 +142,7 @@ class DoclingParser(DocumentParser):
         print(f"Using tesseract at: {tesseract_path}")
         
         # Configure OCR options
-        ocr_options = TesseractOcrOptions(force_full_page_ocr=True)  # Using standard options instead of CLI
+        ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)  # Using standard options instead of CLI
         pipeline_options.ocr_options = ocr_options
         
         # Set up format options based on file type
