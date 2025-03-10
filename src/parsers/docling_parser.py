@@ -131,43 +131,39 @@ class DoclingParser(DocumentParser):
         # Debug information
         print(f"Applying full force OCR to file: {input_doc} (type: {file_extension})")
         
-        # Set up pipeline options
+        # Basic pipeline setup
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = True
         pipeline_options.do_table_structure = True
         pipeline_options.table_structure_options.do_cell_matching = True
         
-        # Configure OCR options - using TesseractCliOcrOptions directly without the text column issue
-        ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)
+        # Find tesseract executable
+        tesseract_path = shutil.which("tesseract") or "/usr/bin/tesseract"
+        print(f"Using tesseract at: {tesseract_path}")
+        
+        # Configure OCR options
+        ocr_options = TesseractOcrOptions(force_full_page_ocr=True)  # Using standard options instead of CLI
         pipeline_options.ocr_options = ocr_options
         
-        # Set up format options for both PDF and image formats
-        format_options = {}
-        
-        # PDF format option
-        format_options[InputFormat.PDF] = PdfFormatOption(
-            pipeline_options=pipeline_options,
-        )
+        # Set up format options based on file type
+        format_options = {
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
         
         # Handle image files
         if file_extension in ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']:
             print(f"Processing as image file: {file_extension}")
-            format_options[InputFormat.IMAGE] = PdfFormatOption(
-                pipeline_options=pipeline_options,
-            )
+            format_options[InputFormat.IMAGE] = PdfFormatOption(pipeline_options=pipeline_options)
         
-        # Create converter with appropriate format options
-        converter = DocumentConverter(format_options=format_options)
-        
+        # Try full force OCR with standard options
         try:
-            # Convert the document
+            converter = DocumentConverter(format_options=format_options)
             result = converter.convert(input_doc)
-            doc = result.document
-            return doc.export_to_markdown()
+            return result.document.export_to_markdown()
         except Exception as e:
-            print(f"Error during OCR processing: {e}")
-            print(f"File type: {file_extension}, File exists: {input_doc.exists()}")
-            return f"OCR failed for {input_doc}. Error: {str(e)}"
+            print(f"Error with standard OCR: {e}")
+            print(f"Attempting fallback to tesseract_cli OCR...")
+            return self.parse(file_path, ocr_method="tesseract_cli")
 
 
 # Register the parser with the registry
