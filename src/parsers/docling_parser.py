@@ -137,47 +137,21 @@ class DoclingParser(DocumentParser):
         pipeline_options.do_table_structure = True
         pipeline_options.table_structure_options.do_cell_matching = True
         
-        # Find tesseract executable
-        tesseract_cmd = None
-        tesseract_paths = [
-            "tesseract",  # Default PATH
-            "/usr/bin/tesseract",  # Common Linux location
-            "/app/tesseract/tesseract",  # Possible custom location in Hugging Face
-            "/opt/conda/bin/tesseract",  # Possible Conda env in Hugging Face
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe"  # Windows location
-        ]
-        
-        for path in tesseract_paths:
-            if shutil.which(path) or (os.path.isfile(path) and os.access(path, os.X_OK)):
-                tesseract_cmd = path
-                print(f"Found tesseract at: {tesseract_cmd}")
-                break
-        
-        if not tesseract_cmd:
-            print("Warning: Tesseract executable not found. Using default configuration.")
-            tesseract_cmd = "tesseract"  # Use default as fallback
-        
-        # Configure OCR options with explicit tesseract path
-        ocr_options = TesseractCliOcrOptions(
-            force_full_page_ocr=True,
-            tesseract_cmd=tesseract_cmd
-        )
+        # Configure OCR options - using TesseractCliOcrOptions directly without the text column issue
+        ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)
         pipeline_options.ocr_options = ocr_options
         
         # Set up format options for both PDF and image formats
         format_options = {}
         
-        # Always include PDF format option
+        # PDF format option
         format_options[InputFormat.PDF] = PdfFormatOption(
             pipeline_options=pipeline_options,
         )
         
-        # For image files, we need to handle them differently
+        # Handle image files
         if file_extension in ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']:
-            # For image files, we'll use the same pipeline options
-            # but we need to specify the input format as IMAGE
             print(f"Processing as image file: {file_extension}")
-            # Note: InputFormat.IMAGE is used for image files in Docling
             format_options[InputFormat.IMAGE] = PdfFormatOption(
                 pipeline_options=pipeline_options,
             )
@@ -191,17 +165,9 @@ class DoclingParser(DocumentParser):
             doc = result.document
             return doc.export_to_markdown()
         except Exception as e:
-            # Provide detailed error information
-            print(f"Error during full force OCR: {e}")
+            print(f"Error during OCR processing: {e}")
             print(f"File type: {file_extension}, File exists: {input_doc.exists()}")
-            
-            # Try fallback to regular OCR if full force fails
-            try:
-                print("Attempting fallback to regular tesseract_cli OCR...")
-                return self.parse(file_path, ocr_method="tesseract_cli")
-            except Exception as fallback_error:
-                print(f"Fallback OCR also failed: {fallback_error}")
-                return f"OCR failed for {input_doc}. Error: {str(e)}"
+            return f"OCR failed for {input_doc}. Error: {str(e)}"
 
 
 # Register the parser with the registry
