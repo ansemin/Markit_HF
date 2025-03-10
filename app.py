@@ -5,6 +5,14 @@ import shutil
 from pathlib import Path
 import urllib.request
 
+# Run setup.sh at startup
+try:
+    print("Running setup.sh...")
+    subprocess.run(["bash", "setup.sh"], check=False)
+    print("setup.sh completed")
+except Exception as e:
+    print(f"Error running setup.sh: {e}")
+
 # Try to load environment variables from .env file
 try:
     from dotenv import load_dotenv
