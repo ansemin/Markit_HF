@@ -35,44 +35,6 @@ def format_markdown_content(content):
     html_content = markdown.markdown(str(content), extensions=['tables'])
     return html_content
 
-
-def split_content_into_pages(content, chars_per_page=6000):
-    if not content:
-        return ["No content to display"]
-    
-    # Split by natural breaks (double newlines) first
-    sections = str(content).split('\n\n')
-    pages = []
-    current_page = []
-    current_length = 0
-    
-    for section in sections:
-        section_length = len(section) + 2  # +2 for double newline
-        
-        if current_length + section_length > chars_per_page and current_page:
-            # Format each page with markdown
-            page_content = '\n\n'.join(current_page)
-            pages.append(format_markdown_content(page_content))
-            current_page = [section]
-            current_length = section_length
-        else:
-            current_page.append(section)
-            current_length += section_length
-    
-    if current_page:
-        # Format the last page with markdown
-        page_content = '\n\n'.join(current_page)
-        pages.append(format_markdown_content(page_content))
-    
-    return pages
-
-
-def update_page_content(pages, page_number):
-    if not pages or page_number < 1 or page_number > len(pages):
-        return "Invalid page", page_number, "Page 0/0"
-    return str(pages[page_number - 1]), page_number, f"Page {page_number}/{len(pages)}"
-
-
 # Function to run conversion in a separate thread
 def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format):
     """Run the conversion in a separate thread and return the thread object"""
@@ -100,7 +62,6 @@ def run_conversion_thread(file_path, parser_name, ocr_method_name, output_format
     
     return thread, results
 
-
 def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_cancelled):
     """Handle file conversion."""
     global conversion_cancelled
@@ -108,7 +69,7 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_ca
     # Check if we should cancel before starting
     if is_cancelled:
         logger.info("Conversion cancelled before starting")
-        return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+        return "Conversion cancelled.", None, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
     
     logger.info("Starting conversion with cancellation flag cleared")
     
@@ -129,14 +90,14 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_ca
             thread.join(timeout=0.5)
             if thread.is_alive():
                 logger.warning("Thread did not finish within timeout")
-            return "Conversion cancelled.", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+            return "Conversion cancelled.", None, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
         
         # Sleep briefly to avoid busy waiting
         time.sleep(0.1)
     
     # Thread has completed, check results
     if results["error"]:
-        return f"Error: {results['error']}", None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+        return f"Error: {results['error']}", None, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
     
     content = results["content"]
     download_file = results["download_file"]
@@ -144,32 +105,29 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_ca
     # If conversion returned a cancellation message
     if content == "Conversion cancelled.":
         logger.info("Converter returned cancellation message")
-        return content, None, [], 1, "", gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+        return content, None, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
     
-    # Process results
-    pages = split_content_into_pages(str(content))
-    page_info = f"Page 1/{len(pages)}"
+    # Format the content
+    formatted_content = format_markdown_content(str(content))
     
     logger.info("Conversion completed successfully")
-    return str(pages[0]) if pages else "", download_file, pages, 1, page_info, gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), None
-
-
-def handle_page_navigation(direction, current, pages):
-    new_page = current + direction
-    if new_page < 1:
-        new_page = 1
-    elif new_page > len(pages):
-        new_page = len(pages)
-    content, page_num, page_info = update_page_content(pages, new_page)
-    return content, new_page, page_info
-
+    return formatted_content, download_file, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
 
 def create_ui():
     with gr.Blocks(css="""
-        .page-navigation { text-align: center; margin-top: 1rem; }
-        .page-navigation button { margin: 0 0.5rem; }
-        .page-info { display: inline-block; margin: 0 1rem; }
-        .processing-controls { display: flex; justify-content: center; gap: 10px; margin-top: 10px; }
+        .markdown-display { 
+            height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .processing-controls { 
+            display: flex; 
+            justify-content: center; 
+            gap: 10px; 
+            margin-top: 10px; 
+        }
     """) as demo:
         gr.Markdown("Markit: Convert any documents to Markdown")
         
@@ -182,18 +140,8 @@ def create_ui():
             with gr.Tab("Upload and Convert"):
                 file_input = gr.File(label="Upload PDF", type="filepath")
                 
-                # Content display with navigation
-                content_pages = gr.State([])
-                current_page = gr.State(1)
-                file_display = gr.Markdown(label="Converted Markdown")
-                
-                with gr.Row(visible=False) as navigation_row:
-                    with gr.Column(scale=1):
-                        prev_btn = gr.Button("←", elem_classes=["page-navigation"])
-                    with gr.Column(scale=1):
-                        page_info = gr.Markdown("Page 1/1", elem_classes=["page-info"])
-                    with gr.Column(scale=1):
-                        next_btn = gr.Button("→", elem_classes=["page-navigation"])
+                # Single scrollable content display
+                file_display = gr.HTML(label="Converted Markdown", elem_classes=["markdown-display"])
                 
                 file_download = gr.File(label="Download File")
                 
@@ -278,7 +226,7 @@ def create_ui():
         ).then(
             fn=handle_convert,
             inputs=[file_input, provider_dropdown, ocr_dropdown, output_format, cancel_requested],
-            outputs=[file_display, file_download, content_pages, current_page, page_info, navigation_row, convert_button, cancel_button, conversion_thread]
+            outputs=[file_display, file_download, convert_button, cancel_button, conversion_thread]
         )
         
         # Handle cancel button click
@@ -287,18 +235,6 @@ def create_ui():
             inputs=[conversion_thread],
             outputs=[convert_button, cancel_button, cancel_requested, conversion_thread],
             queue=False  # Execute immediately
-        )
-
-        prev_btn.click(
-            fn=lambda curr, pages: handle_page_navigation(-1, curr, pages),
-            inputs=[current_page, content_pages],
-            outputs=[file_display, current_page, page_info]
-        )
-
-        next_btn.click(
-            fn=lambda curr, pages: handle_page_navigation(1, curr, pages),
-            inputs=[current_page, content_pages],
-            outputs=[file_display, current_page, page_info]
         )
 
         file_display.change(
