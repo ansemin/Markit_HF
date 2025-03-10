@@ -118,8 +118,10 @@ def create_ui():
     with gr.Blocks(css="""
         /* Simple output container with only one scrollbar */
         .output-container {
-            max-height: 600px;
+            max-height: 420px;  /* Changed from 600px to 70% of original height */
             overflow-y: auto;
+            border: 1px solid #ddd;  /* Added border for better visual definition */
+            padding: 10px;  /* Added padding for better content spacing */
         }
         
         /* Hide any scrollbars from parent containers */
