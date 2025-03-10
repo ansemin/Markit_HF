@@ -107,21 +107,26 @@ def handle_convert(file_path, parser_name, ocr_method_name, output_format, is_ca
         logger.info("Converter returned cancellation message")
         return content, None, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
     
-    # Format the content
+    # Format the content and wrap it in the scrollable container
     formatted_content = format_markdown_content(str(content))
+    html_output = f"<div class='output-container'>{formatted_content}</div>"
     
     logger.info("Conversion completed successfully")
-    return formatted_content, download_file, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
+    return html_output, download_file, gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None
 
 def create_ui():
     with gr.Blocks(css="""
-        .markdown-display { 
-            height: 600px;
+        /* Simple output container with only one scrollbar */
+        .output-container {
+            max-height: 600px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 1rem;
-            margin-bottom: 1rem;
         }
+        
+        /* Hide any scrollbars from parent containers */
+        .gradio-container .prose {
+            overflow: visible;
+        }
+        
         .processing-controls { 
             display: flex; 
             justify-content: center; 
@@ -140,8 +145,11 @@ def create_ui():
             with gr.Tab("Upload and Convert"):
                 file_input = gr.File(label="Upload PDF", type="filepath")
                 
-                # Single scrollable content display
-                file_display = gr.HTML(label="Converted Markdown", elem_classes=["markdown-display"])
+                # Simple output container with just one scrollbar
+                file_display = gr.HTML(
+                    value="<div class='output-container'></div>",
+                    label="Converted Content"
+                )
                 
                 file_download = gr.File(label="Download File")
                 
