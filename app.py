@@ -5,11 +5,16 @@ import shutil
 from pathlib import Path
 import urllib.request
 
+# Get the current directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Run setup.sh at startup
 try:
-    print("Running setup.sh...")
-    subprocess.run(["bash", "setup.sh"], check=False)
-    print("setup.sh completed")
+    setup_script = os.path.join(current_dir, "setup.sh")
+    if os.path.exists(setup_script):
+        print("Running setup.sh...")
+        subprocess.run(["bash", setup_script], check=False)
+        print("setup.sh completed")
 except Exception as e:
     print(f"Error running setup.sh: {e}")
 
@@ -20,9 +25,6 @@ try:
     print("Loaded environment variables from .env file")
 except ImportError:
     print("python-dotenv not installed, skipping .env file loading")
-
-# Get the current directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Function to setup Tesseract
 def setup_tesseract():
