@@ -148,6 +148,8 @@ def create_ui():
         cancel_requested = gr.State(False)
         # State to store the conversion thread
         conversion_thread = gr.State(None)
+        # State to store the output format (fixed to Markdown)
+        output_format_state = gr.State("Markdown")
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
@@ -189,14 +191,6 @@ def create_ui():
                 with gr.Row(elem_classes=["processing-controls"]):
                     convert_button = gr.Button("Convert", variant="primary")
                     cancel_button = gr.Button("Cancel", variant="stop", visible=False)
-
-            with gr.Tab("Output Format"):
-                with gr.Group(elem_classes=["settings-group"]):
-                    output_format = gr.Radio(
-                        label="Output Format",
-                        choices=["Markdown", "JSON", "Text", "Document Tags"],
-                        value="Markdown"
-                    )
 
             with gr.Tab("Chat with Document"):
                 document_text_state = gr.State("")
@@ -243,7 +237,7 @@ def create_ui():
             queue=False  # Execute immediately
         ).then(
             fn=handle_convert,
-            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format, cancel_requested],
+            inputs=[file_input, provider_dropdown, ocr_dropdown, output_format_state, cancel_requested],
             outputs=[file_display, file_download, convert_button, cancel_button, conversion_thread]
         )
         
