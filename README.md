@@ -13,7 +13,7 @@ pinned: false
 
 # Markit: Document to Markdown Converter
 
-**Author: Anse Min** | [GitHub](https://github.com/ansemin)
+**Author: Anse Min** | [GitHub](https://github.com/ansemin) | [LinkedIn](https://www.linkedin.com/in/ansemin/)
 
 ## Overview
 Markit is a powerful tool that converts various document formats (PDF, DOCX, images, etc.) to Markdown format. It uses different parsing engines and OCR methods to extract text from documents and convert them to clean, readable Markdown formats.
