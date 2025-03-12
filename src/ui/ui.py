@@ -135,6 +135,11 @@ def create_ui():
             gap: 10px; 
             margin-top: 10px; 
         }
+        
+        /* Add margin below the provider/OCR options row */
+        .provider-options-row {
+            margin-bottom: 15px;
+        }
     """) as demo:
         gr.Markdown("Markit: Convert any documents to Markdown")
         
@@ -145,6 +150,30 @@ def create_ui():
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
+                # Provider and OCR options moved from Config tab to here
+                gr.Markdown("**Conversion Options:** Select the document processing provider and OCR settings")
+                with gr.Row(elem_classes=["provider-options-row"]):
+                    with gr.Column(scale=1):
+                        parser_names = ParserRegistry.get_parser_names()
+                        default_parser = parser_names[0] if parser_names else "PyPdfium"
+                        
+                        provider_dropdown = gr.Dropdown(
+                            label="Provider",
+                            choices=parser_names,
+                            value=default_parser,
+                            interactive=True
+                        )
+                    with gr.Column(scale=1):
+                        default_ocr_options = ParserRegistry.get_ocr_options(default_parser)
+                        default_ocr = default_ocr_options[0] if default_ocr_options else "No OCR"
+                        
+                        ocr_dropdown = gr.Dropdown(
+                            label="OCR Options",
+                            choices=default_ocr_options,
+                            value=default_ocr,
+                            interactive=True
+                        )
+                
                 file_input = gr.File(label="Upload PDF", type="filepath")
                 
                 # Simple output container with just one scrollbar
@@ -160,30 +189,8 @@ def create_ui():
                     convert_button = gr.Button("Convert", variant="primary")
                     cancel_button = gr.Button("Cancel", variant="stop", visible=False)
 
-            with gr.Tab("Config ⚙️"):
+            with gr.Tab("Output Format"):
                 with gr.Group(elem_classes=["settings-group"]):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            parser_names = ParserRegistry.get_parser_names()
-                            default_parser = parser_names[0] if parser_names else "PyPdfium"
-                            
-                            provider_dropdown = gr.Dropdown(
-                                label="Provider",
-                                choices=parser_names,
-                                value=default_parser,
-                                interactive=True
-                            )
-                        with gr.Column(scale=1):
-                            default_ocr_options = ParserRegistry.get_ocr_options(default_parser)
-                            default_ocr = default_ocr_options[0] if default_ocr_options else "No OCR"
-                            
-                            ocr_dropdown = gr.Dropdown(
-                                label="OCR Options",
-                                choices=default_ocr_options,
-                                value=default_ocr,
-                                interactive=True
-                            )
-                    
                     output_format = gr.Radio(
                         label="Output Format",
                         choices=["Markdown", "JSON", "Text", "Document Tags"],
