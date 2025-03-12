@@ -136,8 +136,9 @@ def create_ui():
             margin-top: 10px; 
         }
         
-        /* Add margin below the provider/OCR options row */
+        /* Add margin above the provider/OCR options row */
         .provider-options-row {
+            margin-top: 15px;
             margin-bottom: 15px;
         }
     """) as demo:
@@ -150,8 +151,10 @@ def create_ui():
 
         with gr.Tabs():
             with gr.Tab("Upload and Convert"):
-                # Provider and OCR options moved from Config tab to here
-                gr.Markdown("**Conversion Options:** Select the document processing provider and OCR settings")
+                # File input first
+                file_input = gr.File(label="Upload PDF", type="filepath")
+                
+                # Provider and OCR options below the file input
                 with gr.Row(elem_classes=["provider-options-row"]):
                     with gr.Column(scale=1):
                         parser_names = ParserRegistry.get_parser_names()
@@ -173,8 +176,6 @@ def create_ui():
                             value=default_ocr,
                             interactive=True
                         )
-                
-                file_input = gr.File(label="Upload PDF", type="filepath")
                 
                 # Simple output container with just one scrollbar
                 file_display = gr.HTML(
